@@ -1,0 +1,65 @@
+K 25
+svn:wc:ra_dav:version-url
+V 45
+/scicomp/!svn/ver/1561/trunk/github/hpc/slurm
+END
+leftover.sh
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/scicomp/!svn/ver/1561/trunk/github/hpc/slurm/leftover.sh
+END
+slurmscp.py
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/scicomp/!svn/ver/1561/trunk/github/hpc/slurm/slurmscp.py
+END
+wtfmp.py
+K 25
+svn:wc:ra_dav:version-url
+V 54
+/scicomp/!svn/ver/1561/trunk/github/hpc/slurm/wtfmp.py
+END
+slurmssh.py
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/scicomp/!svn/ver/1561/trunk/github/hpc/slurm/slurmssh.py
+END
+wtf.py
+K 25
+svn:wc:ra_dav:version-url
+V 52
+/scicomp/!svn/ver/1561/trunk/github/hpc/slurm/wtf.py
+END
+hitparade.py
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/scicomp/!svn/ver/1561/trunk/github/hpc/slurm/hitparade.py
+END
+grabnode.sh
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/scicomp/!svn/ver/1561/trunk/github/hpc/slurm/grabnode.sh
+END
+slurmscpmp.py
+K 25
+svn:wc:ra_dav:version-url
+V 59
+/scicomp/!svn/ver/1561/trunk/github/hpc/slurm/slurmscpmp.py
+END
+README
+K 25
+svn:wc:ra_dav:version-url
+V 52
+/scicomp/!svn/ver/1561/trunk/github/hpc/slurm/README
+END
+grabby.py
+K 25
+svn:wc:ra_dav:version-url
+V 55
+/scicomp/!svn/ver/1561/trunk/github/hpc/slurm/grabby.py
+END

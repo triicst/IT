@@ -1,0 +1,62 @@
+HPC Cluster Reporting Tools
+
+These tools are designed to generate various usage reports based on Slurm job
+completion files and/or Maui exported job completion files.
+
+cluster.sh:
+Driver shell script invoking all of the following tools to generate the FHCRC
+default set of reports.
+
+bender.py:
+This tool reads a job completion log (or logs) and generates either a usage
+report or a CSV file for further processing.
+
+Usage reports are lists of CPU minutes/percentages of total by user, by group
+and by division.  The latter two are derived from looking up users in a
+provided file of users, groups and divisions.
+
+bender [options] job_completion_log[.gz] ...
+Options:
+   -s/-e start/end_date - format mm-dd-yyyy
+   -p partition : only include records in partition
+   -g groups : CSV file of format User,Division,Group,Manager
+   -u user : ignore records from user
+   -c : output in csv format
+   -m member_list: divide by months, member_list and without
+   -w time_window: only include 24 hour range start-finish
+   -M moab_log[.gz] : process Moab formatted log
+
+cluster.r: (requires ggplot2)
+This is a script in the R language that reads the CSV output from bender.py
+and generates PDF figures for users, users by group, users by division, and
+groups.
+
+zoidberg.py: (requires numpy)
+This tool reads a job completion job (or logs) and maps individual job
+records into a record of CPU cores used over time with a granularity of one
+minute.  
+
+Two reports in CSV format may be generated with this program:
+- Date,MinCores,MaxCores,MeanCores,STDCores
+- Top 10 users - Date,User,MaxCores
+
+zoidberg [options] job_completion_log[.gz] ...
+Options:
+   -s start_date : start time as mm-dd-yyyy
+   -e end_date : start time as mm-dd-yyyy
+   -u user : ignore records from user
+   -U user : generate reports only for user(s)
+   -p partition : only include records in Slurm partition
+   -w time_window: only include 24 hour range start-finish
+   -M moab_log[.gz] : process Moab formatted log
+   -T : generate reports only for top users (overrides -U)
+
+cores_bar.r: (requires ggplot2)
+This is a script in the R language that reads the CSV output from zoidberg.py
+and generates a stacked bar figure in PDF format showing the aggregate use
+over the desired timespan.
+
+cores.r: (requires ggplot2)
+This is a script in the R language that reads the CSV output from zoidberg.py
+and generates a line figure in PDF format comparing the usage of two sets of
+users.  In the designed case, this is the top user versus the remainder.

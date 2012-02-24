@@ -1,0 +1,55 @@
+HPC Cluster Management/Monitoring Tools
+These all depend on Slurm tools or configuration files for proper operation
+
+grabnode.sh:
+The grabnode script allows cluster users to reserve up to a definable number
+of cores for interactive use.  This serves as a cluster interface for those
+challenged by the Slurm command set (and possibly the complexities of
+shoelaces as well).
+
+grabby.py:
+The grabby script exists to:
+- Show available nodes for interactive use
+- Show who is allocating interactive nodes
+
+It works in both interactive mode and also in a batch mode where it will
+notify selected users (via email) when resources are constrained.
+
+hitparade.py:
+The hitparade script reports on instantaneous cluster usage by cores by user.
+Using various parameters, the output can be constrained to certain partitions
+and/or certain users only.
+
+leftover.sh:
+The leftover script runs periodically on each cluster node and does 2 things:
+- Kills jobs not associated with an active user
+- Prunes the /tmp directory of files with atimes exceeding 7 days
+
+slurmssh.py:
+The slurmssh script logs into the specified systems and performs the task on
+the remainder of the command line.
+
+Slurmssh by default will use the entire cluster as defined in the
+/etc/slurm/slurm.conf file.  This can be overridden by explicitly specifying a
+partition or partitions or a nodelist in the Slurm nodelist format.
+
+slurmscpmp.py:
+slurmscp.py:
+The slurmscp script will copy a file from the node on which it is run to the
+nodes specified.  The slurmscpmp script is a later implementation of the same
+program that operates in parallel to speed completion.
+
+Slurmscp by default will use the entire cluster as defined in the
+/etc/slurm/slurm.conf file.  This can be overridden by explicitly specifying a
+partition or partitions or a nodelist in the Slurm nodelist format.
+
+wtfmp.py:
+wtf.py:
+The wtf script polls the specified systems via SNMP (depending on net-snmp)
+and prints a sorted list of nodes that have loads exceeding a specified level.
+The wtfmp scrip is a later implementation of the same program that operates in
+parallel to speed completion.
+
+Wtf by default will use the entire cluster as defined in the
+/etc/slurm/slurm.conf file.  This can be overridden by explicitly specifying a
+partition or partitions or a nodelist in the Slurm nodelist format.
