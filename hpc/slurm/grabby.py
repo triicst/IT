@@ -2,9 +2,8 @@
 
 import sys,getopt,commands,hostlist,re,os,smtplib
 
-recipients=["petersen@fhcrc.org","cbenson@fhcrc.org","jkatcher@fhcrc.org"]
-#recipients=["jkatcher@fhcrc.org"]
-mailhost="mx.fhcrc.org"
+recipients=[]
+mailhost="mx.test.org"
 
 def parse_slurm_conf_cores(line,nodelist,node_dict):
    s=re.search("Sockets=(\S+)",line)
