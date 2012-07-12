@@ -21,8 +21,116 @@
 import sys
 import ldap
 
-# IDEntries[ 'joeu': ["adef", ['acct1', 'acct2']]]
-IDEntries = {}
+class idcfg:
+    """
+    A class containing MWM identity manager entries
+
+    IDEntries{
+        'joeu': {
+            username: 'joeu',
+            default: 'adef',
+            accounts: [ 'a1', 'a2', ... ]
+        },
+        'alice': {
+            username: 'alice',
+            default: 'adef',
+            accounts: [ 'a1', 'a2', ... ]
+        },
+        ...
+    }
+    """
+    def __init__( self ):
+        """
+        Intitialize the dictionary object that contains the entries
+
+        """
+        self.entries = {}
+
+    def entryExists(self, username):
+        """
+        Check for the existence of an entry in the account lists
+
+        Returns True if the entry is found, false if not.
+        """
+        if username in self.entries.keys():
+            return True
+        else:
+            return False
+
+    def insertEntry( self, username, adef=None, alist=[] ):
+        """
+        Creates a new entry in the list
+
+        Minimally pass in the username.  Default and account
+        list are empty unless passed in when called
+
+        Will raise an exception if the entry already exists
+        """
+
+        if self.entryExists( username ):
+            raise KeyError(
+                'Insert into existing entry ' + username
+            ) 
+            return False
+        self.entries[username] = {}
+        self.entries[username]['username'] = username
+        self.entries[username]['default'] = adef
+        self.entries[username]['accounts'] = alist
+
+    def getEntry( self, username ):
+        """
+        Return a single entry
+
+        Returns an entry in the list- need to handle circumstances
+        where the username doesn't exist
+        """
+        
+        return self.entries[username]
+
+    def setDefaultAccount( self, username, adef ):
+        """
+        Set the default account for the user
+
+        Updates the default account for the user. Will raise
+        LookupError exception if the entry doesn't exist
+        """
+
+        if not adef in self.entries[username]['accounts']:
+            raise LookupError(
+                'Account \'' + adef + '\' not in users account list'
+            )
+        self.entries[username]['default'] = adef
+
+    def getKeys( self ):
+        for entry in self.entries:
+            print entry
+
+    def getAllEntries( self ):
+        """
+        Returns generator for iterating through entries
+
+        Returns a generator object for use in iterating through
+        account entries
+        """
+        for entry in self.entries:
+            yield self.entries[entry]
+
+    def updateAccountList( self, username, alist ):
+        """
+        Updates the list of accounts
+
+        Probably inaccurate.  Actually only adds accounts to
+        the list of accounts for an entry.  Doesn't accommodate
+        removal, etc.  Probably not important
+        """
+        self.entries[username]['accounts'] = (
+            self.entries[username]['accounts'] + alist
+        )
+
+
+
+IDEntries = idcfg()
+
 overrides = "overrides.txt"
 
 BindDN, Secret = sys.argv[1:3]
@@ -61,21 +169,20 @@ for result in Results:
     actname = lname + "_" + fname[0]
 
     # Add the account owner to their own account
-    # print result
     samname = result[1]['sAMAccountName'][0]
     adef = actname
 
-    if samname in IDEntries.keys():
-        IDEntries[ samname ].append( actname )
-    else:
-        IDEntries[ samname ] = [ actname ]
+    try:
+        IDEntries.insertEntry( samname, adef, [actname] )
+    except KeyError:
+        IDEntries.updateAccountList( samname, [actname] )
+        IDEntries.setDefaultAccount( samname, adef )
 
     if 'directReports' in result[1]:
         for dn in result[1][ 'directReports' ]:
             dn = dn.replace( '\\', '\\5c' )
             dn = dn.replace( '(', '\\28' )
             dn = dn.replace( ')', '\\29' )
-            # print ">>> looking for " + dn
 
             filter = ( "(&(sAMAccountType=805306368)" +
                       "(distinguishedName=" + dn + "))"
@@ -89,10 +196,10 @@ for result in Results:
             if namesearch[0][0]:
                 samname = namesearch[0][1]['sAMAccountName'][0]
 
-                if samname in IDEntries.keys():
-                    IDEntries[ samname ].append( actname )
+                if IDEntries.entryExists( samname ):
+                    IDEntries.updateAccountList( samname, [actname] )
                 else:
-                    IDEntries[ samname ] = [ actname ]
+                    IDEntries.insertEntry( samname, "", [ actname ] )
 
 #
 # Now read in overrides & manual entries
@@ -100,23 +207,22 @@ for result in Results:
 # Overrides are lines of fields separated by spaces
 # first field is the user, the rest are accounts that the
 # user can access:
-#  alice acct1 acct2 acct3 ...
+#  alice adef acct1 acct2 acct3 ...
 #
 f = open( overrides )
 for line in f:
     t = line.split()
-    if t[0] in IDEntries.keys():
-        IDEntries[ t[0] ] = IDEntries[ t[0] ] + t[1:]
+    if IDEntries.entryExists( t[0] ):
+        IDEntries.updateAccountList( t[0], t[2:] )
+        IDEntries.setDefaultAccount( t[0], t[1] )
     else:
-        IDEntries[ t[0] ] = t[1:]
+        IDEntries.insertEntry( t[0], adef=t[1], alist=t[2:] )
 
-    if t[1] == 'ALL':
-        IDEntries[ t[0] ] = [ 'ALL' ]
+for k in IDEntries.getAllEntries():
+    if k['default'] == "":
+        k['default'] = k['accounts'][0]
 
-
-for entry in IDEntries:
-    # user:<username> alist=<account> adef=<account>
     print "user:{} alist={} adef={}".format(
-        entry, ",".join( IDEntries[ entry ]), IDEntries[ entry ][0]
+        k['username'], ",".join( k['accounts'] ), k['default']
     )
 
