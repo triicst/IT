@@ -1,0 +1,153 @@
+#! /usr/bin/env python
+
+# Script that configures slurm/drmaa settings for Galaxy 
+# and also offers to configure production settings for new installs
+# (proxy server, database server, etc)
+
+import ConfigParser, os, sys, re, shutil
+
+def raw_input_default(prompt,dflt=None):
+  if dflt:
+    prompt = "%s [%s]: " % (prompt, dflt)
+  res = raw_input(prompt)
+  if not res and dflt:
+    return dflt
+  return res
+
+def file_replace(fname, pat, s_after):
+  # first, see if the pattern is even in the file.
+  with open(fname) as f:
+    if not any(re.search(pat, line) for line in f):
+      return # pattern does not occur in file so we are done.
+  with open(fname) as f:  
+    if any(re.search(s_after, line) for line in f):
+      return # target pattern already in file so we are also done.
+  # pattern is in the file, so perform replace operation.
+  with open(fname) as f:
+    out_fname = fname + ".tmp"
+    out = open(out_fname, "w")
+    for line in f:
+      out.write(re.sub(pat, s_after, line))
+    out.close()
+    os.rename(out_fname, fname)
+
+scriptdir=os.path.dirname(os.path.realpath(__file__))
+user=os.getenv('USER')
+if not user:
+  user=os.getenv('USERNAME')
+
+new_install=0
+if os.path.isfile('universe_wsgi.ini.sample'):
+  if not os.path.isfile('universe_wsgi.ini'):
+    shutil.copyfile('universe_wsgi.ini.sample', 'universe_wsgi.ini')
+    new_install=1
+  else:
+    for i in range(1,100):
+      if not os.path.isfile('universe_wsgi.ini.%s' % i):
+        shutil.copyfile('universe_wsgi.ini', 'universe_wsgi.ini.%s' % i)
+	print('universe_wsgi.ini backed up to universe_wsgi.ini.%s !' % i)
+	break
+  if os.path.isfile('%s/galaxy-slurm.py' % scriptdir):
+    shutil.copyfile('%s/galaxy-slurm.py' % scriptdir,
+		    'lib/galaxy/jobs/runners/slurm.py')
+  elif os.path.isfile('/app/galaxy/galaxy-slurm.py'):
+    shutil.copyfile('/app/galaxy/galaxy-slurm.py',
+		    'lib/galaxy/jobs/runners/slurm.py')
+  else:
+    print('\ngalaxy-slurm.py not found. Please copy the Slurm DRMAA runner \
+		    to "lib/galaxy/jobs/runners/slurm.py"\n')
+else:
+  print("'universe_wsgi.ini.sample' not found. \
+		  This may not be a galaxy home directory")
+  sys.exit()
+
+host=""
+parser1 = ConfigParser.SafeConfigParser()
+parser1.read('universe_wsgi.ini')
+try:
+  host=parser1.get('server:main', 'host')
+except:
+  pass
+if not host:
+  host = '127.0.0.1'
+  if new_install==1:
+    host='0.0.0.0'
+parser1.set('server:main', 'host', host)
+parser1.set('app:main', 'start_job_runners', 'slurm')
+parser1.set('app:main', 'default_cluster_job_runner', 'slurm://-p any -t 3-0 -A noaccount/')
+parser1.set('app:main', 'retry_job_output_collection', '3')
+parser1.write(open('universe_wsgi.ini','w'))
+#parser1.write(sys.stdout)
+print('slurm config written to universe_wsgi.ini')
+
+# tried config parser first, but does not seem to work with eggs.ini
+# now deactivated because new slurm runner looks in local debian python path first 
+##ret = file_replace('eggs.ini', 'no_auto = pbs_python DRMAA_python', 'no_auto = pbs_python DRMAA_python drmaa')
+##ret = file_replace('eggs.ini', 'drmaa = 0.4b3', ';drmaa = 0.4b3')
+##print('drmaa config written to eggs.ini')
+
+try:
+  import drmaa
+except:
+  print ('\nError importing python module drmaa. Please make sure that package python-drmaa is installed\n')
+
+# Is this a new install, should it be setup for production?
+
+if new_install == 0:
+  sys.exit()
+ret=raw_input_default("This is a new install. Do you also want to configure this instance for production?","Y/N")
+if ret == "N" or ret == "n":
+  sys.exit()
+
+mydomain = os.popen("hostname -d").read().strip()
+parser1.read('universe_wsgi.ini')
+parser1.set('server:main', 'host', '127.0.0.1') #work behind a proxy (e.g. Apache)
+parser1.set('app:main', 'use_remote_user', 'True')
+parser1.set('app:main', 'remote_user_maildomain', mydomain)
+
+pgdef="postgres://username:password@hostname:5432/database_name"
+ret=raw_input_default("Please enter the postgresql database connection",pgdef)
+if ret != pgdef:
+  parser1.set('app:main', 'database_connection', ret)
+  parser1.set('app:main', 'database_engine_option_server_side_cursors', 'True')
+  parser1.set('app:main', 'database_engine_option_pool_size', '5')
+  parser1.set('app:main', 'database_engine_option_max_overflow', '10')
+  parser1.set('app:main', 'database_engine_option_strategy', 'threadlocal')
+  #parser1.set('app:main', '', '')
+
+parser1.set('app:main', 'debug', 'False')
+parser1.set('app:main', 'use_interactive', 'False')
+parser1.set('app:main', 'retry_job_output_collection', '3')
+parser1.set('app:main', 'set_metadata_externally', 'True')
+
+ret=raw_input_default("Please enter comma-separated email addresses of admin users: ")
+if ret:
+  parser1.set('app:main', 'admin_users', ret)
+parser1.set('app:main', 'cleanup_job', 'always')
+#parser1.set('app:main', 'environment_setup_file', 'environmentSetupFile.txt')
+#parser1.set('app:main', '', '')
+#parser1.set('app:main', '', '')
+
+parser1.write(open('universe_wsgi.ini','w'))
+  #parser1.write(sys.stdout)
+
+print('production config written to universe_wsgi.ini')
+
+if os.path.isfile('/etc/debian_version'):
+  shutil.copyfile('contrib/galaxy.debian-init', 'galaxy.debian-init')
+  ret=file_replace('galaxy.debian-init', 'DIR="/home/galaxy/galaxy_dist/"', 
+		  'DIR="%s/"' % os.getcwd())
+  ret=file_replace('galaxy.debian-init', 'USER="galaxy"', 
+		                    'USER="%s"' % user)
+  ret=file_replace('galaxy.debian-init', '--log-file /home/galaxy/galaxy.log',
+		          '--log-file %s/galaxy.log' % os.getcwd())
+  ret=file_replace('galaxy.debian-init', '\$local_fs \$mysql','$local_fs $remote_fs')
+
+  print('\nnow ... as root please copy galaxy.debian-init from the current directory\n' 
+		'to /etc/init.d/galaxy, make the file executable and run\n'
+		'"update-rc.d galaxy defaults" to activate it at bootup time\n Done!')
+else:
+  print('\nnow ... as root please copy contrib/galaxy.fedora-init to /etc/init.d/galaxy,\n'
+		  'make the file executable and ensure it starts at boot time')
+
+
