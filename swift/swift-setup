@@ -1,0 +1,296 @@
+#! /usr/bin/env python
+
+# Script that configures a basic version of openstack swift for testing 
+# docs from http://vivekraghuwanshi.wordpress.com/configure-swift-storage-in-ubuntu-12-04/
+# and from  http://docs.openstack.org/developer/swift/development_saio.html
+
+import ConfigParser, os, sys, re, shutil, subprocess, commands, getopt, socket
+
+scriptdir=os.path.dirname(os.path.realpath(__file__)) #the directory this script resides in
+mydomain = os.popen("hostname -d").read().strip()
+hostname = os.popen("hostname").read().strip()
+ipaddress = os.popen("ifconfig").read().strip().split("\n")[1].split()[1][5:]
+user=os.getenv('USER')
+if not user:
+    user=os.getenv('USERNAME')
+
+def main(argv):
+    checkEnv(user)
+    try:
+        opts,args=getopt.getopt(argv,"n:h")
+        for opt,arg in opts:
+            if opt in ("-h"):
+                usage()
+                sys.exit()
+            elif opt in ("-n"): # all storage nodes
+                nodes=arg.split(',')
+        if not args:
+            usage()
+            sys.exit()
+        if args[0] == 'storage':
+            setupCommon()
+            setupStorage()
+        elif args[0] == 'proxy':
+            setupCommon()
+            setupProxy(nodes)
+        else:
+            usage()
+            sys.exit()
+    except getopt.GetoptError:
+            print("\noption not available, correct usage:")
+            usage()
+
+def checkEnv(user):
+    if user != 'root':
+        print("you need to execute this script as root, try sudo")
+        sys.exit()
+    if not os.path.isfile('/etc/debian_version'):
+        print ("This setup only works on Debian/Ubuntu systems")
+        sys.exit()
+    if sys.hexversion<0x02070000:
+        print ("Python 2.7 or higher required")
+        sys.exit()
+
+def setupCommon():
+    print ('common ...............')
+    script = """
+    apt-get -y install python-software-properties swift
+    #apt-get -y install gcc git-core
+    #add-apt-repository -y ppa:swift-core/release
+    #apt-get update
+    #apt-get -y install curl python-configobj python-netifaces
+    #apt-get -y install python-coverage python-dev python-nose python-setuptools 
+    #apt-get -y install python-simplejson python-xattr sqlite3 xfsprogs python-webob 
+    #apt-get -y install python-eventlet python-greenlet python-pastedeploy python-memcache
+    mkdir -p /etc/swift
+    chown -R swift:swift /etc/swift/
+    """
+    results=run_script(script)
+
+    parser1 = ConfigParser.SafeConfigParser()
+    parser1.add_section('swift-hash')
+    parser1.set('swift-hash', 'swift_hash_path_suffix', 'qazwsxedcrfvtgb')
+    parser1.write(open('/etc/swift/swift.conf','w'))
+
+def setupStorage():
+    print ('Storage ..............')
+    script = """
+    apt-get -y install swift-account swift-container swift-object xfsprogs
+    mkfs.xfs -i size=1024 /dev/sdb -f
+    echo "/dev/sdb /srv/node/sdb xfs noatime,nodiratime,nobarrier,logbufs=8 0 0" >> /etc/fstab
+    mkdir -p /srv/node/sdb
+    mount /srv/node/sdb
+    chown -R swift:swift /srv/node
+    """
+    results=run_script(script)
+
+    parser1 = ConfigParser.SafeConfigParser()
+    parser1.add_section('dummy')
+    parser1.set('dummy', 'uid', 'swift')
+    parser1.set('dummy', 'gid', 'swift')
+    parser1.set('dummy', 'log file', '/var/log/rsyncd.log')
+    parser1.set('dummy', 'pid file', '/var/run/rsync-swift.pid')
+    parser1.set('dummy', 'address', '%s' % hostname)
+    parser1.add_section('account')
+    parser1.set('account', 'max connections', '2')
+    parser1.set('account', 'path', '/srv/node/')
+    parser1.set('account', 'read only', 'false')
+    parser1.set('account', 'lock file', '/var/lock/account.lock')
+    parser1.add_section('container')
+    parser1.set('container', 'max connections', '2')
+    parser1.set('container', 'path', '/srv/node/')
+    parser1.set('container', 'read only', 'false')
+    parser1.set('container', 'lock file', '/var/lock/container.lock')
+    parser1.add_section('object')
+    parser1.set('object', 'max connections', '2')
+    parser1.set('object', 'path', '/srv/node/')
+    parser1.set('object', 'read only', 'false')
+    parser1.set('object', 'lock file', '/var/lock/object.lock')
+    parser1.write(open('/etc/rsyncd.conf','w'))
+    ret=file_replace('/etc/rsyncd.conf','\[dummy\]','# rsync config for openstack swift')
+    ret=file_replace('/etc/default/rsync', 'RSYNC_ENABLE=false','RSYNC_ENABLE=true')
+    script = """
+    service rsync restart
+    swift-init object-server restart  
+    swift-init object-replicator restart
+    swift-init object-updater restart
+    swift-init object-auditor restart
+    swift-init container-server restart
+    swift-init container-replicator restart
+    swift-init container-updater restart
+    swift-init container-auditor restart
+    swift-init account-server restart
+    swift-init account-replicator restart
+    swift-init account-auditor restart
+    """
+    results=run_script(script)
+
+def setupProxy(nodes):
+    print ('Proxy ..............')
+
+    nodeaddresses=[]
+    for node in nodes:
+        if hostname.startswith(node):
+            nodeaddresses.append(ipaddress)
+        else:
+            nodeaddresses.append(socket.gethostbyaddr(node)[2][0])
+    script = """
+    apt-get -y install swift-proxy memcached keystone
+    openssl req -new -x509 -nodes -out /etc/swift/cert.crt -keyout /etc/swift/cert.key
+    """
+    results=run_script(script)
+    ret=file_replace('/etc/memcached.conf', '-l 127.0.0.1','#-l 127.0.0.1')
+    script = """
+    service memcached restart
+    """
+    results=run_script(script)
+    parser1 = ConfigParser.SafeConfigParser()
+    parser1.add_section('DEF')
+    parser1.set('DEF', 'bind_port', '443')
+    parser1.set('DEF', 'user', 'swift')
+    parser1.set('DEF', 'log_facility', 'LOG_LOCAL')
+    parser1.set('DEF', 'bind_ip', '%s' % ipaddress)
+    parser1.set('DEF', 'cert_file', '/etc/swift/cert.crt')
+    parser1.set('DEF', 'key_file', '/etc/swift/cert.key')
+    parser1.set('DEF', 'workers', '8')
+    parser1.add_section('pipeline:main')
+    parser1.set('pipeline:main', 'pipeline', 'catch_errors healthcheck cache authtoken keystone proxy-server')
+    parser1.add_section('app:proxy-server')
+    parser1.set('app:proxy-server', 'use', 'egg:swift#proxy')
+    parser1.set('app:proxy-server', '#allow_account_management', 'true')
+    parser1.set('app:proxy-server', 'account_autocreate', 'true')
+    parser1.add_section('filter:keystone')
+    parser1.set('filter:keystone', 'paste.filter_factory', 'keystone.middleware.swift_auth:filter_factory')
+    parser1.set('filter:keystone', 'operator_roles', 'admin, swiftoperator')
+    parser1.add_section('filter:authtoken')
+    parser1.set('filter:authtoken', 'paste.filter_factory', 'keystone.middleware.auth_token:filter_factory')
+    parser1.set('filter:authtoken', 'delay_auth_decision', '1')
+    parser1.set('filter:authtoken', 'service_port', '5000')
+    parser1.set('filter:authtoken', 'service_host', 'authserver')
+    parser1.set('filter:authtoken', 'auth_port', '35357')
+    parser1.set('filter:authtoken', 'auth_host', 'authserver')
+    parser1.set('filter:authtoken', 'auth_token', 'ADMIN')
+    parser1.set('filter:authtoken', 'admin_token', 'ADMIN')
+    parser1.add_section('filter:cache')
+    parser1.set('filter:cache', 'use', 'egg:swift#memcache')
+    parser1.set('filter:cache', 'set log_name', 'cache')
+    parser1.add_section('filter:catch_errors')
+    parser1.set('filter:catch_errors', 'use', 'egg:swift#catch_errors')
+    parser1.add_section('filter:healthcheck')
+    parser1.set('filter:healthcheck', 'use', 'egg:swift#healthcheck')
+    parser1.write(open('/etc/swift/proxy-server.conf','w'))
+    ret=file_replace('/etc/swift/proxy-server.conf','\[DEF\]','[DEFAULT]')
+
+    os.chdir('/etc/swift')
+    #Create the account, container and object rings#
+    script = """
+    swift-ring-builder account.builder create 18 3 1
+    swift-ring-builder container.builder create 18 3 1
+    swift-ring-builder object.builder create 18 3 1
+    """
+    results=run_script(script)
+    #every storage device on each node add entries to each ring#
+    cnt=0
+    for nodeaddress in nodeaddresses:
+        cnt+=1
+        script = """
+        swift-ring-builder account.builder add z%s-%s:6002/sdb 100
+        swift-ring-builder container.builder add z%s-%s:6001/sdb 100
+        swift-ring-builder object.builder add z%s-%s:6000/sdb 100
+        """ % (cnt,nodeaddress,cnt,nodeaddress,cnt,nodeaddress)
+        results=run_script(script)
+    
+    #Verify the ring contents for each ring and rebalance the ring#
+    script = """
+    swift-ring-builder account.builder
+    swift-ring-builder container.builder
+    swift-ring-builder object.builder
+    swift-ring-builder account.builder rebalance
+    swift-ring-builder container.builder rebalance
+    swift-ring-builder object.builder rebalance
+    swift-init proxy start
+    """
+    results=run_script(script)
+
+    msg = """
+    Now copy the account.ring.gz, container.ring.gz, and object.ring.gz
+    files to each of the Proxy and Storage nodes in /etc/swift/ and
+    make sure they are owned by the swift user.
+
+     e.g.
+     eval `ssh-agent`; ssh-add
+     ssh HOST1 "mkdir /etc/swift"
+     scp /etc/swift/*.gz HOST1:/etc/swift/
+     ssh HOST1 "chown -R swift:swift /etc/swift"
+
+    You might have to restart the swift proxy after the setup 
+    is complete: swift-init proxy restart
+    """    
+    print(msg)
+
+def file_replace(fname, pat, s_after):
+    # first, see if the pattern is even in the file.
+    with open(fname) as f:
+        if not any(re.search(pat, line) for line in f):
+            return # pattern does not occur in file so we are done.
+    with open(fname) as f:  
+        if any(re.search(s_after, line) for line in f):
+            return # target pattern already in file so we are also done.
+    # pattern is in the file, so perform replace operation.
+    with open(fname) as f:
+        out_fname = fname + ".tmp"
+        out = open(out_fname, "w")
+        for line in f:
+            out.write(re.sub(pat, s_after, line))
+        out.close()
+        os.rename(out_fname, fname)
+
+def run_script(script, output=True, stdin=None):
+    """Returns (stdout, stderr), raises error on non-zero return code"""
+    # Note: by using a list here (['bash', ...]) you avoid quoting issues, as the 
+    # arguments are passed in exactly this order (spaces, quotes, and newlines won't
+    # cause problems):
+    for line in script.split('\n'):
+        if output:
+            try:
+                print("************* Executing command: %s" % line)
+                stdout = subprocess.call(line,shell=True)
+            except:
+                print("Error executing command: %s" % line)
+        else:
+            proc = subprocess.Popen(['bash', '-c', line],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                stdin=subprocess.PIPE)
+            stdout, stderr = proc.communicate()
+            if proc.returncode:
+                raise ScriptException(proc.returncode, stdout, stderr, script)
+    return stdout
+
+class ScriptException(Exception):
+    def __init__(self, returncode, stdout, stderr, script):
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+        Exception.__init__('Error in script')
+
+def raw_input_default(prompt,dflt=None):
+    if dflt:
+        prompt = "%s [%s]: " % (prompt, dflt)
+    res = raw_input(prompt)
+    if not res and dflt:
+        return dflt
+    return res
+
+def usage():
+    print ("swift-setup [options] [proxy|storage]")
+    print ("\t-n node1,node2,node2 - comma separated list of storage nodes")
+    print ("\t-h show this help")
+    print ("\t Examples:")
+    print ("\t swift-setup -n server1,server,server3 proxy")
+    print ("\t swift-setup storage")
+    print ("\t (Note: first install the proxy, then the storage)")
+
+if __name__=="__main__":
+    main(sys.argv[1:])
+    sys.exit()
+
