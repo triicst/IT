@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-# Script that configures a basic version of openstack swift for testing 
+# Script that configures a basic version of openstack swift for testing ! 
 # docs from http://vivekraghuwanshi.wordpress.com/configure-swift-storage-in-ubuntu-12-04/
 # and from  http://docs.openstack.org/developer/swift/development_saio.html
 
