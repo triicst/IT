@@ -1,10 +1,13 @@
 #! /usr/bin/env python
 
-# Script that configures a basic version of openstack swift for testing ! 
-# docs from http://vivekraghuwanshi.wordpress.com/configure-swift-storage-in-ubuntu-12-04/
-# and from  http://docs.openstack.org/developer/swift/development_saio.html
+HEADER = """
+swift-setup is a simple script that configures a basic version of openstack 
+swift for testing. The script is based on documentation from:
+http://vivekraghuwanshi.wordpress.com/configure-swift-storage-in-ubuntu-12-04/
+and from http://docs.openstack.org/developer/swift/development_saio.html
+"""
 
-import ConfigParser, os, sys, re, shutil, subprocess, commands, getopt, socket
+import ConfigParser, os, sys, re, shutil, subprocess, commands, getopt, socket, time
 
 scriptdir=os.path.dirname(os.path.realpath(__file__)) #the directory this script resides in
 mydomain = os.popen("hostname -d").read().strip()
@@ -66,7 +69,6 @@ def setupCommon():
     chown -R swift:swift /etc/swift/
     """
     results=run_script(script)
-
     parser1 = ConfigParser.SafeConfigParser()
     parser1.add_section('swift-hash')
     parser1.set('swift-hash', 'swift_hash_path_suffix', 'qazwsxedcrfvtgb')
@@ -74,6 +76,10 @@ def setupCommon():
 
 def setupStorage():
     print ('Storage ..............')
+    if not os.path.isfile('/etc/swift/account.ring.gz'):
+        print("\n***** WARNING: /etc/swift/account.ring.gz not found *********")
+        print("***** You did not copy the ring files from the proxy ??? ****\n")
+        time.sleep(5)
     script = """
     apt-get -y install swift-account swift-container swift-object xfsprogs
     mkfs.xfs -i size=1024 /dev/sdb -f
@@ -124,6 +130,11 @@ def setupStorage():
     swift-init account-auditor restart
     """
     results=run_script(script)
+    if not os.path.isfile('/etc/swift/account.ring.gz'):
+        print("\n***** WARNING: /etc/swift/account.ring.gz not found *********")
+        print("***** You did not copy the ring files from the proxy ??? ****\n")
+    else:
+        print("\nSwift storage node %s setup finished. Please proceed to the next node." % hostname)
 
 def setupProxy(nodes):
     print ('Proxy ..............')
@@ -145,16 +156,17 @@ def setupProxy(nodes):
     """
     results=run_script(script)
     parser1 = ConfigParser.SafeConfigParser()
-    parser1.add_section('DEF')
-    parser1.set('DEF', 'bind_port', '443')
-    parser1.set('DEF', 'user', 'swift')
-    parser1.set('DEF', 'log_facility', 'LOG_LOCAL')
-    parser1.set('DEF', 'bind_ip', '%s' % ipaddress)
-    parser1.set('DEF', 'cert_file', '/etc/swift/cert.crt')
-    parser1.set('DEF', 'key_file', '/etc/swift/cert.key')
-    parser1.set('DEF', 'workers', '8')
+    parser1.add_section('DEFAULT1')
+    parser1.set('DEFAULT1', 'bind_port', '443')
+    parser1.set('DEFAULT1', 'user', 'swift')
+    parser1.set('DEFAULT1', 'log_facility', 'LOG_LOCAL')
+    parser1.set('DEFAULT1', 'bind_ip', '%s' % ipaddress)
+    parser1.set('DEFAULT1', 'cert_file', '/etc/swift/cert.crt')
+    parser1.set('DEFAULT1', 'key_file', '/etc/swift/cert.key')
+    parser1.set('DEFAULT1', 'workers', '8')
     parser1.add_section('pipeline:main')
-    parser1.set('pipeline:main', 'pipeline', 'catch_errors healthcheck cache authtoken keystone proxy-server')
+    parser1.set('pipeline:main', '#pipeline', 'catch_errors healthcheck cache authtoken keystone proxy-server')
+    parser1.set('pipeline:main', 'pipeline', 'catch_errors healthcheck cache tempauth proxy-server')
     parser1.add_section('app:proxy-server')
     parser1.set('app:proxy-server', 'use', 'egg:swift#proxy')
     parser1.set('app:proxy-server', '#allow_account_management', 'true')
@@ -171,6 +183,10 @@ def setupProxy(nodes):
     parser1.set('filter:authtoken', 'auth_host', 'authserver')
     parser1.set('filter:authtoken', 'auth_token', 'ADMIN')
     parser1.set('filter:authtoken', 'admin_token', 'ADMIN')
+    parser1.add_section('filter:tempauth')
+    parser1.set('filter:tempauth', 'use', 'egg:swift#tempauth')
+    parser1.set('filter:tempauth', 'user_system_root', 'testpass .admin')
+    parser1.set('filter:tempauth', 'user_test_tester', 'testing .admin')
     parser1.add_section('filter:cache')
     parser1.set('filter:cache', 'use', 'egg:swift#memcache')
     parser1.set('filter:cache', 'set log_name', 'cache')
@@ -178,9 +194,12 @@ def setupProxy(nodes):
     parser1.set('filter:catch_errors', 'use', 'egg:swift#catch_errors')
     parser1.add_section('filter:healthcheck')
     parser1.set('filter:healthcheck', 'use', 'egg:swift#healthcheck')
+    parser1.add_section('filter:proxy-logging')
+    parser1.set('filter:proxy-logging', 'use', 'egg:swift#proxy_logging')
     parser1.write(open('/etc/swift/proxy-server.conf','w'))
-    ret=file_replace('/etc/swift/proxy-server.conf','\[DEF\]','[DEFAULT]')
-
+    #ret=file_replace('/etc/swift/proxy-server.conf','\[DEFAULT1\]', '[DEFAULT]')
+    script = "sed -i 's/\[DEFAULT1\]/\[DEFAULT\]/' /etc/swift/proxy-server.conf"
+    results=run_script(script)
     os.chdir('/etc/swift')
     #Create the account, container and object rings#
     script = """
@@ -219,10 +238,13 @@ def setupProxy(nodes):
 
      e.g.
      eval `ssh-agent`; ssh-add
-     ssh HOST1 "mkdir /etc/swift"
-     scp /etc/swift/*.gz HOST1:/etc/swift/
-     ssh HOST1 "chown -R swift:swift /etc/swift"
-
+    """
+    print (msg)
+    for node in nodes:
+        print('     ssh root@%s "mkdir /etc/swift"' % node)
+        print('     scp /etc/swift/*.gz root@%s:/etc/swift/' % node)
+        print('     ssh root@%s "chown -R swift:swift /etc/swift"\n' % node)
+    msg = """
     You might have to restart the swift proxy after the setup 
     is complete: swift-init proxy restart
     """    
@@ -250,11 +272,13 @@ def run_script(script, output=True, stdin=None):
     # Note: by using a list here (['bash', ...]) you avoid quoting issues, as the 
     # arguments are passed in exactly this order (spaces, quotes, and newlines won't
     # cause problems):
+    stdout = ""
     for line in script.split('\n'):
         if output:
             try:
-                print("************* Executing command: %s" % line)
-                stdout = subprocess.call(line,shell=True)
+                if line:
+                    print("************* Executing command: %s" % line)
+                    stdout = subprocess.call(line,shell=True)
             except:
                 print("Error executing command: %s" % line)
         else:
@@ -282,13 +306,23 @@ def raw_input_default(prompt,dflt=None):
     return res
 
 def usage():
-    print ("swift-setup [options] [proxy|storage]")
+    print (HEADER)
+    print ("\nsudo swift-setup [options] [proxy|storage]")
     print ("\t-n node1,node2,node2 - comma separated list of storage nodes")
-    print ("\t-h show this help")
-    print ("\t Examples:")
-    print ("\t swift-setup -n server1,server,server3 proxy")
-    print ("\t swift-setup storage")
-    print ("\t (Note: first install the proxy, then the storage)")
+    print ("\t-h show this help\n")
+    print ("\t First: run this command on the proxy server:")
+    print ("\t\t sudo swift-setup -n server1,server,server3 proxy")
+    print ("\t and follow all instructions like copying ring files via scp")
+    print ("\t Second: run this command on each of the storage nodes:")
+    print ("\t\t sudo swift-setup storage")
+    print ("\t Third: use e.g. Cloudberry Explorer to connect to the proxy:")
+    print ("\t e.g. https://%s.%s/auth/v1.0 with credentials:" % (hostname,mydomain))
+    print ("\t user = test:tester and password = testing")
+    print ("\t or run curl or swift commmand line client:")
+    print ("\t\t curl -k -v -H 'X-Storage-User: test:tester' -H 'X-Storage-Pass: testing'")
+    print ("\t\t\t https://%s.%s/auth/v1.0" % (hostname,mydomain))
+    print ("\t ")
+    print ("\n") 
 
 if __name__=="__main__":
     main(sys.argv[1:])
