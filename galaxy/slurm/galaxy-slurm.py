@@ -189,7 +189,9 @@ class DRMAAJobRunner( BaseJobRunner ):
             log.exception("failure running job %s" % job_wrapper.get_id_tag())
             return
 
-        runner_url = job_wrapper.get_job_runner()
+        # this is new sept 2012
+        #runner_url = job_wrapper.get_job_runner()
+        runner_url = job_wrapper.get_job_runner_url()
 
         # This is silly, why would we queue a job with no command line?
         if not command_line:
