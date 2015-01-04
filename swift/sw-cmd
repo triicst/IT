@@ -1,0 +1,627 @@
+#! /bin/bash
+#  wrapper for python-swiftclient and curl that implements 
+#  toolset similar to known unix file system tools for easy
+#  interaction with the swift object store 
+# 
+#  install: copy sc-cmd into bin directory in PATH such as
+#  /usr/local/bin and execute sc-cmd to create commands as 
+#  symlinks to sc-cmd
+#
+#  to do:
+#  * sw-download: parallel download for single multi-segment files
+#  * sw-upload: dynmically adjust --segment-size to max performance
+#
+#  references: 
+#  * http://www.thegeekstuff.com/2010/07/bash-string-manipulation/
+#  * http://www.thegeekstuff.com/2010/06/bash-array-tutorial/ 
+#  dirkpetersen / January 2015
+#  version: 1.0
+
+scriptname=${0##*/}
+cwd=$(pwd)
+commands='sw-upload sw-download sw-cd sw-ls sw-list sw-rm sw-archive sw-cat sw-more sw-less sw-openwith'
+
+### user definded functions ###
+echoerr(){
+  # echo to stderr instead of stdout
+  echo -e "$@" 1>&2
+}
+pathexist(){
+  if ! [[ -e $1 ]]; then
+    echoerr "Error: path '$1' does not exist\n"
+    exit
+  fi
+}
+argexist(){
+if [[ -z $1 ]]; then
+  echoerr "\nusage: $scriptname </file>"
+  echoerr "     ->   open file from swift object store\n"
+  echoerr "also please check these commands:"
+  echoerr $commands
+  exit
+fi
+}
+splitpath(){
+  # splitting a standard path into container and object
+  # "splitpath input:$1"
+  local p="$1"
+  if [[ "$p" != /* ]]; then  # if folder does not start with a slash it's relative
+    #echo nostart
+    local c=`cat ~/.swift/current_folder`
+    if [[ "$c" == "/" ]]; then p=$c$p; else p=$c/$p; fi
+    #echo "rel p:$p"
+  fi
+  #echo "new p:$p"
+  cont=${p#/} # remove leading slash
+  cont=${cont%%/*} # #extract first/root dir
+  obj=${p#/} # remove leading slash
+  if [[ "$obj" =~ "/" ]]; then  # if path contains a slash 
+    obj=${obj#*/} # remove first/root dir from string
+  else
+    obj=""
+  fi
+  #echoerr "splitpath output: cont:$cont obj:$obj"
+}
+urlencode() {
+    local data
+    data="$(curl -s -o /dev/null -w %{url_effective} --get --data-urlencode "$1" "")"
+    echo "${data##/?}"
+}
+arrayContains () { 
+  local array="$1[@]"
+  local seeking=$2
+  local in=1
+  for element in "${!array}"; do
+    if [[ $element == $seeking ]]; then
+      in=0
+      break
+    fi
+  done
+  return $in
+}
+checkAuthToken () {
+  local file=~/.swift/auth_token
+  local maxage=$(bc <<< '24*60*60') # seconds in a day, token is good for 24h
+  local fileage=$(($(date +%s) - $(stat -c '%Y' "$file")))
+  test $fileage -ge $maxage && {
+    #echo "$file is equal or older than $maxage seconds"
+    # currently only implemeted for v1.0 auth
+    local xauthtoken=`curl -is \
+        -H "X-Auth-Key: $ST_KEY" \
+        -H "X-Auth-User: $ST_USER" \
+        $ST_AUTH | grep -e "^X-Auth-Token: "`
+    authtoken=${xauthtoken/"X-Auth-Token: "/""}
+    echo $authtoken > $file
+    #echoerr $xauthtoken
+  }
+}
+
+############## main  script ##############################3
+red=$(tput setaf 1)      # set font color
+yellow=$(tput setaf 2)   # set font color
+blue=$(tput setaf 4)     # set font color
+endcolor=$(tput sgr0)    # reset the foreground colour
+oldifs=$IFS              # gets the current internal field seperator, default:  $IFS=$' \t\n'
+if [[ -z $oldifs ]]; then
+  oldifs=$' \t\n'
+fi
+
+# custom python loaded via "Environment Modules"
+if [ -d $MODULESHOME ]; then
+  module load python2 > /dev/null 2>&1
+fi
+# check if swift and curl exist in path
+if ! hash swift 2>/dev/null; then
+  echoerr "no swift client installed, please install package 'python-swiftclient'"
+fi
+if ! hash curl 2>/dev/null; then
+  echoerr "no swift client installed, please install package 'curl'"
+fi
+# custom script to create TMPDIR based on avail. of ssd, space, etc
+if hash fhmktemp 2>/dev/null; then
+  export TMPDIR=`fhmktemp`
+fi
+# source swift credentials
+if [ -f ~/.swiftrc ]; then
+  source ~/.swiftrc 
+else
+  if [[ "$scriptname" != "sw-cmd" ]]; then
+    if [[ -z $ST_AUTH && -z $OS_AUTH_URL ]]; then
+      echo "~/.swiftrc does not exist, please run swift-switch-account to create credentials"
+    fi
+    if [[ -z $ST_USER && -z $OS_USERNAME ]]; then
+      export ST_USER=$USER
+      #export OS_USERNAME=$USER
+    fi
+    if [[ -z $ST_KEY && -z $OS_PASSWORD ]]; then
+      read -t 60 -p "Enter your swift password/key for $ST_USER:" mypass
+      if [[ -z $mypass ]]; then exit; fi
+      export ST_KEY=$mypass
+      #export OS_PASSWORD=$mypass
+    fi
+  fi
+fi
+# create .swift folder to persist settings / temp data on file system
+if ! [[ -d ~/.swift ]]; then 
+  mkdir -p ~/.swift
+  echo "/" > ~/.swift/current_folder
+  touch -d "1 day ago" ~/.swift/auth_token
+  chmod 600 ~/.swift/auth_token
+fi
+
+# initialize storage url and make sure auth token is current
+storageurl=${ST_AUTH/"/auth/v1.0"/"/v1/AUTH_$ST_USER"}
+authtoken=`cat ~/.swift/auth_token`
+#echo "auth:$authtoken"
+if [[ "$scriptname" != "sw-cmd" ]]; then
+  checkAuthToken
+fi
+
+#########  TEST ZONE  #################################
+
+#ret=`swift list something`
+#if ! [[ $? = 0 ]]; then
+#  echoerr "Error executing 'swift list' command."
+#fi
+#exit
+
+######### END TEST ZONE ###############################
+
+case "$scriptname" in
+  sw-upload)
+    if [[ -z $1 || -z $2 ]]; then
+      echoerr "\nusage: $scriptname </source> </target>"
+      echoerr "     ->   uploading file or directory to swift object store\n"
+      echoerr "also please check these commands:"
+      echoerr $commands
+      exit
+    fi
+    pathexist "$1"
+    src=${1%/}      #remove trailing slash from source
+    splitpath "$2"  
+    targ=""
+    if [[ "${2: -1}" = "/" ]]; then  # if target ends with a /
+      if [[ -f "$src" ]]; then # if src is a file
+        targ="${1##*/}"         # extract filename from path $1
+      else
+        targ=`basename "$1"`
+      fi
+      obj+=$targ # append file or base dir  to target
+    fi
+    swiftcmd="swift upload --changed --segment-size=2147483648
+              --object-name=$obj $cont $src"
+             # --skip-identical is better than --changed because it uses md5sum
+             # to compare, however there is a bug: 
+             # https://bugs.launchpad.net/python-swiftclient/+bug/1379252
+             # --segment-size=2g is possible with latest swiftclient master 
+             # only, 2147483648 = gibibyte
+    echoerr "...uploading $src \nto /$cont/$obj, please wait..."
+    echoerr "executing:$swiftcmd"
+    ret=`swift upload --changed --segment-size=2147483648 --object-name="$obj" "$cont" "$src" 1>&2`
+    if [[ $? = 0 ]]; then
+      echo "$2$targ"
+    else
+      echoerr "error uploading $src to $2$targ"
+    fi
+    cd $cwd
+    ;;
+  sw-download)
+    if [[ -z "$1" ]]; then
+      echoerr "\nusage: $scriptname </source> [/target]"
+      echoerr "   ->  downloading file or directory from swift object store\n"
+      echoerr "if /target is omitted, files are copied to TMPDIR\n"
+      echoerr "also please check these commands:"
+      echoerr $commands
+      exit
+    fi
+    splitpath "$1"
+    dest="$2"
+    if [[ -z $2 ]]; then
+      dest=$TMPDIR
+    fi
+    IFS=$'\t\n'
+    objlist=(`swift list --prefix="$obj" "$cont"`)
+    IFS=$oldifs
+    if ! [[ $? = 0 ]]; then
+      echoerr "Error executing 'swift list' command."
+      exit
+    fi
+    if [ -z $objlist ]; then
+      echoerr "file or directory $1 does not exist!"
+      exit
+    fi
+    #for t in "${objlist[@]}"; do 
+      # looping through object list, not needed right now
+      #echo "object: $t"
+    #done
+    numobj=${#objlist[@]}
+    swiftcmd="swift download --prefix=\"$obj\" $cont"
+    if [[ $numobj -gt 1 ]]; then
+      # destination must be a directory
+      if ! [[ -d "$dest" ]]; then
+        mkdir -p "$dest"
+      fi
+      cd "$dest"
+    else
+      # destination must be a file
+      if [[ -d "$dest" ]]; then
+        # destination is still a directory
+        srcfile=`basename "$1"`
+        dest=$dest/$srcfile
+      fi
+      swiftcmd="swift download --output=\"$dest\" \"$cont\" \"$obj\""
+    fi 
+    echoerr "...downloading $1, please wait..."
+    echoerr "executing:$swiftcmd"
+    if [[ $numobj -gt 1 ]]; then
+      ret=`swift download --prefix="$obj" "$cont" 1>&2`
+    else
+      ret=`swift download --output="$dest" "$cont" "$obj" 1>&2` 
+    fi     
+    if [[ $? = 0 ]]; then
+      echo "$dest"
+    else
+      echoerr "error downloading $1"
+      cd "$cwd"
+      exit
+    fi
+    if [[ $numobj -gt 1 ]]; then
+      # if target is directory move downloaded files from 
+      # subdir based on --prefix up to actual target dir 
+      if [[ -d "$obj" ]]; then
+        objdir=${obj%/}    # remove trailing slash
+      else
+        objdir=`dirname "$obj"`
+      fi
+      IFS=$'\t\n' 
+      for myitem in `ls "$objdir"`; do 
+        #echo "moving $objdir/$myitem to `pwd`"
+        dummy=`mv "$objdir/$myitem" .`
+      done
+      IFS=$oldifs 
+      rmdir -p "$objdir"
+    fi
+    cd "$cwd"
+    ;;
+  sw-cd)
+    if [[ -z $1 ]]; then
+      echoerr "\nusage: $scriptname <folder>"
+      echoerr "     ->   change current folder in swift object store\n"
+      echoerr "also please check these commands:"
+      echoerr $commands
+      exit
+    fi
+    splitpath "$1"
+    dest="$1"
+    if [[ "$dest" = "/" ]]; then
+      echo "$dest" > ~/.swift/current_folder
+      echo "$dest"
+      exit
+    fi
+    cur_fld=`cat ~/.swift/current_folder`
+    #echoerr "cd cur_fld:$cur_fld"
+    if ! [[ -z $cur_fld ]]; then
+      if [[ $dest = ".." ]]; then 
+        dest=`dirname "$cur_fld"`
+        #echoerr "dest:$dest"
+        if [[ -z $dest ]]; then
+          dest="/"
+        fi
+        echo "$dest" > ~/.swift/current_folder
+        echo "$dest"
+        exit 
+      fi
+      if [[ "${dest:0:1}" != "/" ]]; then  # relative cd (folder does not start with a /)
+        dest=${cur_fld%/}/$dest
+        #echoerr "splitpath dest:$dest"
+        splitpath "$dest"
+      fi
+    fi
+    dest="${dest%/}" # remove trailing slash
+    obj=${obj%/}  #remove trailing slash
+    #echoerr "cont:$cont"
+    #echoerr "obj:$obj"
+    IFS=$'\t\n'   # change internal field seperator
+    if [[ "$obj" = "" ]]; then
+      objlist=(`swift list "$cont"`)
+    else
+      objlist=(`swift list --prefix="$obj/" "$cont"`) #add a trailing slash to ensure pseudo dir
+    fi
+    IFS=$oldifs
+    if [[ $? != 0 ]]; then
+      echoerr "error executing swift!"
+    fi
+    #echo "objlist:$objlist"
+    numobj=${#objlist[@]}
+    #echoerr "numobj2:$numobj"
+    if [[ $numobj -gt 0 ]]; then
+      dest="${dest%/}" # remove trailng slash
+      echo $dest > ~/.swift/current_folder
+      #echo "wrote $dest to .swift/current_folder"
+      echo $dest
+    else
+      if [[ "$obj" != "" ]]; then 
+        echoerr "folder $dest does not exist."
+      else
+        ret=`swift stat "$cont" 2>&1`
+        if [[ $? != 0 ]]; then
+          echoerr "folder $dest does not exist."
+        else
+          echoerr "folder $dest is empty."
+          echo $dest > ~/.swift/current_folder
+        fi
+      fi
+      cat ~/.swift/current_folder
+    fi
+    ;;
+  sw-ls)
+    dest="$1"
+    if ! [[ -z $dest ]]; then
+      dummy=`sw-cd "$1"`
+    fi 
+    cur_fld=`cat ~/.swift/current_folder`
+    splitpath "$cur_fld"
+    #echoerr "cur_fld:$cur_fld"`
+    if [[ -z $cur_fld ]]; then
+      echoerr "no current folder, use sw-cd to change folder."
+      exit
+    fi    
+    obj=${obj%/}  #remove trailing slash
+    #echoerr "ls cont:$cont"
+    #echoerr "ls obj:$obj"
+    IFS=$'\t\n'   # change internal field seperator
+    if [[ "$obj" = "" ]]; then
+      objlist=(`swift list "$cont"`)
+    else
+      objlist=(`swift list --prefix="$obj/" "$cont"`)   #add a trailing slash 
+    fi
+    IFS=$oldifs
+    numobj=${#objlist[@]}
+    #echo "numobj:$numobj"
+    if [[ $numobj -eq 0 ]]; then
+      echoerr "folder $cur_fld is empty."
+      exit
+    fi
+    #echo "objlist:$objlist"
+    lenprefix=${#obj}
+    #echoerr "lenprefix:$lenprefix"
+    declare -a myfolders=()
+    for t in "${objlist[@]}"; do 
+      #echo "t:$t"
+      # looping through object list, 
+      recurpath="${t:$lenprefix}"       #   list cur dir recursively
+      recurpath=${recurpath#/}          #   remove leading slash
+      #echoerr "recurpath:$recurpath"
+      thislevel="${recurpath%%/*}"      #   extract everything left of first slash
+      #echoerr "thislevel:$thislevel"
+      if [[ "$recurpath" = "$thislevel" ]]; then
+        if [[ $thislevel != *_segments && $thislevel != .* ]]; then 
+          # ignore hidden folders and folders that just contain segments 
+          if [[ $cont == "" ]]; then 
+            echo "${yellow}$thislevel${endcolor}" # print containers yellow
+          else
+            echo "$thislevel"
+          fi
+        fi
+      else
+        #echoerr "myfolders:${myfolders[@]}"
+        if ! ( arrayContains myfolders "$thislevel" ); then 
+          if [[ $thislevel != .* ]]; then
+            echo "${blue}$thislevel${endcolor}"
+          fi
+          myfolders=("${myfolders[@]}" "$thislevel") # add element to array
+        fi
+      fi 
+    done
+    echoerr "folder: $cur_fld"
+    ;;
+  sw-list)
+    if [[ -z $1 ]]; then
+      echoerr "\nusage: $scriptname </path> [search string]"
+      echoerr "     ->   list all folders/files below path\n"
+      echoerr "optionally filter result by search string"
+      echoerr "also please check these commands:"
+      echoerr $commands 
+      swift list --lh | grep -v ".trash-" | grep -v "_segments"
+      exit
+    fi
+    dest=$1
+    splitpath $dest
+    if [[ "$obj" = "" ]]; then
+      if [[ -z $2 ]]; then
+        swift list --lh "$cont"
+      else
+        swift list --lh "$cont" | grep -i $2
+      fi
+    else
+      if [[ -z $2 ]]; then
+        swift list --lh --prefix="$obj" "$cont"
+      else
+        swift list --lh --prefix="$obj" "$cont" | grep -i $2
+      fi
+    fi
+    ;;
+  sw-rm)  
+    if [[ -z $1 ]]; then
+      echoerr "\nusage: $scriptname <path_to_delete>"
+      echoerr "     ->   delete files/objects from swift\n"      
+      echoerr "also please check these commands:"
+      echoerr $commands
+      exit 1
+    fi
+    dest="$1"
+    if [[ $dest = "/" ]]; then
+      echoerr "cannot delete root folder"
+      exit 1
+    fi
+    if [[ $dest != /* ]]; then
+      echoerr "$scriptname currently does not support relative paths, path must start with '/'"
+      exit 1
+    fi
+    splitpath "$dest"
+    #echoerr "rm cont:$cont"
+    #echoerr "rm obj:$obj"
+    IFS=$'\t\n'
+    if [[ "$obj" = "" ]]; then
+      objlist=(`swift list "$cont"`)
+    else
+      objlist=(`swift list --prefix="$obj" "$cont"`) 
+    fi
+    IFS=$oldifs
+    numobj=${#objlist[@]}
+    if [[ $numobj -eq 0 ]]; then
+      if [[ "$obj" != "" ]]; then
+        echoerr "nothing to delete"
+      else
+        ret=`swift delete "$cont"`
+      fi
+      exit 1
+    fi
+    rm -f "$TMPDIR/bulk_del.txt"
+    for t in "${objlist[@]}"; do
+      # looping through object list to count files to delete
+      if [[ $t == $obj* ]]; then
+        urlencode "$cont/$t" >> "$TMPDIR/bulk_del.txt"
+      fi
+    done
+    num2del=`wc -l < $TMPDIR/bulk_del.txt`
+    echoerr "...deleting $num2del files under /$cont/$obj*, please wait..."
+    echoerr "...wait 10 sec then execute curl *?bulk-delete -X DELETE"
+    sleep 10
+    res=`curl -H "Content-Type: text/plain"  \
+         -H "X-Auth-Token: $authtoken"  \
+         $storageurl/?bulk-delete -X DELETE  \
+         --data-binary @$TMPDIR/bulk_del.txt`
+    if [[ $? != 0 ]]; then
+      echoerr "error executing curl !"
+    fi
+    echoerr ${res%%Response*}
+    ;;
+  sw-archive)
+    # consider SLURM_JOB_CPUS_PER_NODE
+    echo "archive"
+    mydir=`swift stat "$1"`
+    ;;
+  sw-cat)
+    argexist $1
+    myfile=`sw-download "$1"`
+    if [[ -d "$myfile" ]]; then
+      echoerr "\n$1 is not a single file, multiple files " \
+              "were downloaded and saved in\n"
+      echo $myfile
+    else
+      cat "$myfile"
+    fi
+    ;;
+  sw-more)
+    argexist $1
+    myfile=`sw-download "$1"`
+    if [[ -d "$myfile" ]]; then
+      echoerr "\n$1 is not a single file, multiple files " \
+              "were downloaded and saved in\n"
+      echo $myfile
+    else
+      more "$myfile"
+    fi
+    ;;
+  sw-less)
+    argexist $1
+    myfile=`sw-download "$1"`
+    if [[ -d "$myfile" ]]; then
+      echoerr "\n$1 is not a single file, multiple files " \
+              "were downloaded and saved in\n"
+      echo $myfile
+    else
+      less "$myfile"
+    fi
+    ;;
+  sw-openwith)
+     if [[ -z $1 || -z $2 ]]; then
+      echoerr "\nusage: $scriptname <application> </file or /folder>"
+      echoerr "     ->   open file from swift object store with application\n"
+      echoerr "also please check these commands:"
+      echoerr $commands
+      exit
+    fi
+    myfile=`sw-download "$2"`
+    if [[ -d "$myfile" ]]; then
+      echoerr "\n$2 is not a single file, multiple files " \
+              "were downloaded and saved in\n"
+      echo $myfile
+    else
+      $1 "$myfile"
+    fi
+    ;;
+  sw-mkdir)
+    echoerr "mkdir is not implemented as directories are created automatically"
+    ;;
+  sw-cmd)
+    echoerr "creating symlinks for sw-cmd utils.."
+    cmddir=$(readlink -f $(dirname "$0"))
+    cd $cmddir
+    for mycmd in $commands; do
+      rm -f $mycmd
+      ln -s sw-cmd $mycmd
+    done
+    cd $cwd
+    ;;
+  *)
+    echo "other"
+    ;;
+esac
+
+exit
+
+
+
+# dumpster for extra code
+
+#echo "auth:$authtoken"
+
+#  this does not work right now, error 401
+#swiftcmd="swift --os-storage-url $storageurl --os-auth-token $authtoken list"
+#echo $swiftcmd
+#$swiftcmd
+
+# 
+# extracts swift hostname, currently not in use
+#swhostpath=${ST_AUTH#*//}     # remove proto and // 
+#swhost=${swhostpath%%.*}  # remove everything after first .
+
+#a better sw-list 
+
+#    splitpath $dest
+#    #obj=${obj%/}  #remove trailing slash
+#    #echoerr "ls cont:$cont"
+#    #echoerr "ls obj:$obj"
+#    #filt=""
+#    #if ! [[ -z $2 ]]; then
+#    #  filt="| grep -i $2"
+#    #fi
+#    if [[ "$obj" = "" ]]; then
+#      #objlist=(`swift list --lh $cont $filt`) # no --lh right now 
+#      #objlist=`swift list --lh $cont $filt`
+#      if [[ -z $2 ]]; then
+#        swift list --lh "$cont"
+#      else
+#        swift list --lh "$cont" | grep -i $2
+#      fi
+#    else
+#      #objlist=(`swift list --lh --prefix=$obj $cont $filt`)
+#      #objlist=`swift list --lh --prefix=$obj $cont $filt`
+#      if [[ -z $2 ]]; then
+#        swift list --lh --prefix="$obj" "$cont"
+#      else
+#        swift list --lh --prefix="$obj" "$cont" | grep -i $2
+#      fi
+#    fi
+#    #numobj=${#objlist[@]}
+#   #if [[ $numobj -eq 0 ]]; then
+#    #  echoerr "folder $cur_fld is empty."
+#    #  exit
+#    #fi
+#    #echo $objlist
+
+
+
+
