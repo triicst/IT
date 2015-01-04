@@ -121,6 +121,9 @@ fi
 if hash fhmktemp 2>/dev/null; then
   export TMPDIR=`fhmktemp`
 fi
+if [[ -z $TMPDIR ]]; then
+  TMPDIR=`mktemp -d --tmpdir=/tmp $USER.XXXXX`
+fi
 # source swift credentials
 if [ -f ~/.swiftrc ]; then
   source ~/.swiftrc 
