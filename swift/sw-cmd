@@ -79,6 +79,26 @@ arrayContains () {
   done
   return $in
 }
+findUser() {
+  # get the real username, even if script is run via sudo or su -
+  local thisPID=$$
+  local origUser=`whoami`
+  local thisUser=$origUser
+  local ARR=()
+  local myPPid=""  
+  if [[ "$origUser" != "root" ]]; then
+    echo $origUser
+    return 0
+  fi
+  while [ "$thisUser" = "$origUser" ]; do
+    ARR=($(ps h -p$thisPID -ouser,ppid;))
+    thisUser="${ARR[0]}"
+    myPPid="${ARR[1]}"
+    thisPID=$myPPid
+  done
+  getent passwd "$thisUser" | cut -d: -f1
+}
+
 checkAuthToken () {
   local file=~/.swift/auth_token
   local maxage=$(bc <<< '24*60*60') # seconds in a day, token is good for 24h
@@ -191,8 +211,8 @@ case "$scriptname" in
       fi
       obj+=$targ # append file or base dir  to target
     fi
-    swiftcmd="swift upload --changed --segment-size=2147483648
-              --object-name=$obj $cont $src"
+    me=$(findUser)
+    swiftcmd="swift upload --changed --segment-size=2147483648 --header \"X-Object-Meta-Uploaded-by:$me\" --object-name=$obj $cont $src"
              # --skip-identical is better than --changed because it uses md5sum
              # to compare, however there is a bug: 
              # https://bugs.launchpad.net/python-swiftclient/+bug/1379252
@@ -200,7 +220,8 @@ case "$scriptname" in
              # only, 2147483648 = gibibyte
     echoerr "...uploading $src \nto /$cont/$obj, please wait..."
     echoerr "executing:$swiftcmd"
-    ret=`swift upload --changed --segment-size=2147483648 --object-name="$obj" "$cont" "$src" 1>&2`
+    ret=`swift upload --changed --segment-size=2147483648 --header \
+         "X-Object-Meta-Uploaded-by:$me" --object-name="$obj" "$cont" "$src" 1>&2`
     if [[ $? = 0 ]]; then
       echo "$2$targ"
     else
@@ -559,14 +580,16 @@ case "$scriptname" in
     echoerr "mkdir is not implemented as directories are created automatically"
     ;;
   sw-cmd)
-    echoerr "creating symlinks for sw-cmd utils.."
     cmddir=$(readlink -f $(dirname "$0"))
+    echoerr "creating symlinks for sw-cmd tool collection in $cmddir:"
+    echoerr $commands
     cd $cmddir
     for mycmd in $commands; do
       rm -f $mycmd
       ln -s sw-cmd $mycmd
     done
     cd $cwd
+    echoerr "Done."
     ;;
   *)
     echo "other"
