@@ -80,7 +80,17 @@ arrayContains () {
   done
   return $in
 }
-
+swiftCreds() {
+  if ! [[ -z $OS_USERNAME ]]; then
+    swiftaccount=$OS_USERNAME
+    swiftpassword=$OS_PASSWORD
+    swiftauthurl=$OS_AUTH_URL
+  elif ! [[ -z $ST_USER ]]; then
+    swiftaccount=$ST_USER
+    swiftpassword=$ST_KEY
+    swiftauthurl=$ST_AUTH
+  fi
+}
 findRealUser() {
   # get the real username, if script is run via sudo or su -
   local thisPID=$$
@@ -101,7 +111,6 @@ findRealUser() {
   done
   getent passwd "$thisUser" | cut -d: -f1
 }
-
 checkAuthToken () {
   local file=~/.swift/auth_token
   local maxage=$(bc <<< '24*60*60') # seconds in a day, token is good for 24h
@@ -110,9 +119,9 @@ checkAuthToken () {
     #echo "$file is equal or older than $maxage seconds"
     # currently only implemeted for v1.0 auth
     local xauthtoken=`curl -is \
-        -H "X-Auth-Key: $ST_KEY" \
-        -H "X-Auth-User: $ST_USER" \
-        $ST_AUTH | grep -e "^X-Auth-Token: "`
+        -H "X-Auth-Key: $swiftpassword" \
+        -H "X-Auth-User: $swiftaccount" \
+        $swiftauthurl | grep -e "^X-Auth-Token: "`
     authtoken=${xauthtoken/"X-Auth-Token: "/""}
     echo $authtoken > $file
     #echoerr $xauthtoken
@@ -152,18 +161,23 @@ if [[ -z $TMPDIR ]]; then
   TMPDIR=`mktemp -d --tmpdir=/tmp $USER.XXXXX`
 fi
 
+swiftaccount=""
+swiftpassword=""
+swiftauthurl=""
+swiftCreds
+
 # get swift credentials
 if [[ "$scriptname" != "sw-cmd" ]]; then
-  if [[ -z $ST_AUTH && -z $OS_AUTH_URL ]]; then
+  if [[ -z $swiftauthurl ]]; then
     echo "Swift Authentication URL not set. Please contact your System Administrator"
     exit 1
   fi
-  if [[ -z $ST_USER && -z $OS_USERNAME ]]; then
+  if [[ -z $swiftaccount ]]; then
     echo "Swift credentials not set. Please execute 'sw2account <accountname>' to get credentials"
     exit 1
   else
-    if [[ -z $ST_KEY && -z $OS_PASSWORD ]]; then
-      read -t 60 -p "Enter your swift password/key for $ST_USER($OS_USERNAME)" mypass
+    if [[ -z $swiftpassword ]]; then
+      read -t 60 -p "Enter your swift password/key for $swiftaccount:" mypass
       if [[ -z $mypass ]]; then 
         exit
       fi      
@@ -187,7 +201,7 @@ if ! [[ -d ~/.swift ]]; then
 fi
 
 # initialize storage url and make sure auth token is current
-storageurl=${ST_AUTH/"/auth/v1.0"/"/v1/AUTH_$ST_USER"}
+storageurl=${swiftauthurl/"/auth/v1.0"/"/v1/AUTH_$swiftaccount"}
 authtoken=`cat ~/.swift/auth_token`
 #echo "auth:$authtoken"
 if [[ "$scriptname" != "sw-cmd" ]]; then
@@ -235,6 +249,7 @@ case "$scriptname" in
              # https://bugs.launchpad.net/python-swiftclient/+bug/1379252
              # --segment-size=2g is possible with latest swiftclient master 
              # only, 2147483648 = gibibyte
+    echoerr "using account ${yellow}$swiftaccount{endcolor}:"
     echoerr "*** uploading $src ***\n*** to /$cont/$obj ***\n please wait... "
     echoerr "executing:$swiftcmd"
     ret=`swift upload --changed --segment-size=2147483648 --header \
@@ -364,9 +379,9 @@ case "$scriptname" in
     #echoerr "obj:$obj"
     IFS=$'\t\n'   # change internal field seperator
     if [[ "$obj" = "" ]]; then
-      objlist=(`swift list "$cont"`)
+      objlist=(`swift list --delimiter=/ "$cont"`)
     else
-      objlist=(`swift list --prefix="$obj/" "$cont"`) #add a trailing slash to ensure pseudo dir
+      objlist=(`swift list --prefix="$obj/" --delimiter=/ "$cont"`) #add a trailing slash to ensure pseudo dir
     fi
     IFS=$oldifs
     if [[ $? != 0 ]]; then
@@ -412,9 +427,9 @@ case "$scriptname" in
     #echoerr "ls obj:$obj"
     IFS=$'\t\n'   # change internal field seperator
     if [[ "$obj" = "" ]]; then
-      objlist=(`swift list "$cont"`)
+      objlist=(`swift list --delimiter=/ "$cont"`)
     else
-      objlist=(`swift list --prefix="$obj/" "$cont"`)   #add a trailing slash 
+      objlist=(`swift list --prefix="$obj/" --delimiter=/ "$cont"`)   #add a trailing slash 
     fi
     IFS=$oldifs
     numobj=${#objlist[@]}
@@ -526,6 +541,7 @@ case "$scriptname" in
       fi
     done
     num2del=`wc -l < $TMPDIR/bulk_del.txt`
+    echoerr "using account ${yellow}$swiftaccount{endcolor}:"
     echoerr "...deleting $num2del files under /$cont/$obj*, please wait..."
     echoerr "...wait 10 sec then execute curl $storageurl/?bulk-delete -X DELETE"
     sleep 10
@@ -594,9 +610,21 @@ case "$scriptname" in
     fi
     ;;
   sw-mkdir)
-    echoerr "mkdir is not implemented as directories are created automatically when using sw-upload"
+    echoerr "mkdir is not implemented as directories are created" \
+            "automatically when using sw-upload"
     ;;
   sw-cmd)
+    if [[ "`whoami`" != "root" ]]; then
+      echo "sw-cmd is a tools collection that allows you to interact" \
+           "with an openstack swift cloud storage system (almost) as" \
+           "if it were a file system."
+      if ! hash "sw-mkdir" 2>/dev/null; then
+	  echoerr "please copy this script to a bin directory (e.g" \
+                   "/usr/local/bin/) and run it as root to create all" \
+                   "required aliases (symlinks) of this tools collection"
+      fi
+      exit 0
+    fi
     cmddir=$(readlink -f $(dirname "$0"))
     echoerr "creating symlinks for sw-cmd tool collection in $cmddir:"
     echoerr $commands
@@ -609,62 +637,8 @@ case "$scriptname" in
     echoerr "Done."
     ;;
   *)
-    echo "other"
+    #echo "this script is an alias or a copy of sw-cmd, however $scriptname is currently not supported"
+    #echoerr ""
     ;;
 esac
-
-exit
-
-
-
-# dumpster for extra code
-
-#echo "auth:$authtoken"
-
-#  this does not work right now, error 401
-#swiftcmd="swift --os-storage-url $storageurl --os-auth-token $authtoken list"
-#echo $swiftcmd
-#$swiftcmd
-
-# 
-# extracts swift hostname, currently not in use
-#swhostpath=${ST_AUTH#*//}     # remove proto and // 
-#swhost=${swhostpath%%.*}  # remove everything after first .
-
-#a better sw-list 
-
-#    splitpath $dest
-#    #obj=${obj%/}  #remove trailing slash
-#    #echoerr "ls cont:$cont"
-#    #echoerr "ls obj:$obj"
-#    #filt=""
-#    #if ! [[ -z $2 ]]; then
-#    #  filt="| grep -i $2"
-#    #fi
-#    if [[ "$obj" = "" ]]; then
-#      #objlist=(`swift list --lh $cont $filt`) # no --lh right now 
-#      #objlist=`swift list --lh $cont $filt`
-#      if [[ -z $2 ]]; then
-#        swift list --lh "$cont"
-#      else
-#        swift list --lh "$cont" | grep -i $2
-#      fi
-#    else
-#      #objlist=(`swift list --lh --prefix=$obj $cont $filt`)
-#      #objlist=`swift list --lh --prefix=$obj $cont $filt`
-#      if [[ -z $2 ]]; then
-#        swift list --lh --prefix="$obj" "$cont"
-#      else
-#        swift list --lh --prefix="$obj" "$cont" | grep -i $2
-#      fi
-#    fi
-#    #numobj=${#objlist[@]}
-#   #if [[ $numobj -eq 0 ]]; then
-#    #  echoerr "folder $cur_fld is empty."
-#    #  exit
-#    #fi
-#    #echo $objlist
-
-
-
 
