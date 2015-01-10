@@ -1,4 +1,5 @@
 #! /bin/bash
+#  * Swift Commander *
 #  wrapper for python-swiftclient and curl that implements 
 #  toolset similar to known unix file system tools for easy
 #  interaction with the swift object store 
@@ -19,7 +20,7 @@
 
 scriptname=${0##*/}
 cwd=$(pwd)
-commands='sw-upload sw-download sw-cd sw-ls sw-list sw-rm sw-archive sw-cat sw-more sw-less sw-openwith'
+commands='sw-upload sw-download sw-cd sw-ls sw-list sw-rm sw-archive sw-cat sw-more sw-less sw-mkdir sw-openwith'
 
 ### user definded functions ###
 echoerr(){
@@ -79,13 +80,14 @@ arrayContains () {
   done
   return $in
 }
-findUser() {
-  # get the real username, even if script is run via sudo or su -
+
+findRealUser() {
+  # get the real username, if script is run via sudo or su -
   local thisPID=$$
   local origUser=`whoami`
   local thisUser=$origUser
   local ARR=()
-  local myPPid=""  
+  local myPPid=""
   if [[ "$origUser" != "root" ]]; then
     echo $origUser
     return 0
@@ -95,6 +97,7 @@ findUser() {
     thisUser="${ARR[0]}"
     myPPid="${ARR[1]}"
     thisPID=$myPPid
+    if [[ $thisPID == 0 ]]; then break ;fi
   done
   getent passwd "$thisUser" | cut -d: -f1
 }
@@ -137,6 +140,10 @@ fi
 if ! hash curl 2>/dev/null; then
   echoerr "no swift client installed, please install package 'curl'"
 fi
+if ! hash curl 2>/dev/null; then
+  echoerr "no swift client installed, please install package 'curl'"
+fi
+
 # custom script to create TMPDIR based on avail. of ssd, space, etc
 if hash fhmktemp 2>/dev/null; then
   export TMPDIR=`fhmktemp`
@@ -144,26 +151,33 @@ fi
 if [[ -z $TMPDIR ]]; then
   TMPDIR=`mktemp -d --tmpdir=/tmp $USER.XXXXX`
 fi
-# source swift credentials
-if [ -f ~/.swiftrc ]; then
-  source ~/.swiftrc 
-else
-  if [[ "$scriptname" != "sw-cmd" ]]; then
-    if [[ -z $ST_AUTH && -z $OS_AUTH_URL ]]; then
-      echo "~/.swiftrc does not exist, please run swift-switch-account to create credentials"
-    fi
-    if [[ -z $ST_USER && -z $OS_USERNAME ]]; then
-      export ST_USER=$USER
-      #export OS_USERNAME=$USER
-    fi
+
+# get swift credentials
+if [[ "$scriptname" != "sw-cmd" ]]; then
+  if [[ -z $ST_AUTH && -z $OS_AUTH_URL ]]; then
+    echo "Swift Authentication URL not set. Please contact your System Administrator"
+    exit 1
+  fi
+  if [[ -z $ST_USER && -z $OS_USERNAME ]]; then
+    echo "Swift credentials not set. Please execute 'sw2account <accountname>' to get credentials"
+    exit 1
+  else
     if [[ -z $ST_KEY && -z $OS_PASSWORD ]]; then
-      read -t 60 -p "Enter your swift password/key for $ST_USER:" mypass
-      if [[ -z $mypass ]]; then exit; fi
-      export ST_KEY=$mypass
-      #export OS_PASSWORD=$mypass
+      read -t 60 -p "Enter your swift password/key for $ST_USER($OS_USERNAME)" mypass
+      if [[ -z $mypass ]]; then 
+        exit
+      fi      
+      if ! [[ -z $OS_USERNAME ]]; then
+        export OS_PASSWORD=$mypass
+      elif ! [[ -z $ST_USER ]]; then
+        export ST_KEY=$mypass
+      else
+        echo "no credentials set"
+      fi
     fi
   fi
 fi
+
 # create .swift folder to persist settings / temp data on file system
 if ! [[ -d ~/.swift ]]; then 
   mkdir -p ~/.swift
@@ -187,6 +201,8 @@ fi
 #  echoerr "Error executing 'swift list' command."
 #fi
 #exit
+# env | grep ST_
+# env | grep OS_
 
 ######### END TEST ZONE ###############################
 
@@ -203,29 +219,30 @@ case "$scriptname" in
     src=${1%/}      #remove trailing slash from source
     splitpath "$2"  
     targ=""
-    if [[ "${2: -1}" = "/" ]]; then  # if target ends with a /
+    if [[ "${2: -1}" = "/" || "/$cont" = "$2" ]]; then  
+      # if target ends with a / or if target is a container with leading /
       if [[ -f "$src" ]]; then # if src is a file
-        targ="${1##*/}"         # extract filename from path $1
+        targ="${1##*/}"        # extract filename from path $1
       else
         targ=`basename "$1"`
       fi
-      obj+=$targ # append file or base dir  to target
+      obj+=$targ # append file or base dir to target
     fi
-    me=$(findUser)
+    me=$(findRealUser)
     swiftcmd="swift upload --changed --segment-size=2147483648 --header \"X-Object-Meta-Uploaded-by:$me\" --object-name=$obj $cont $src"
              # --skip-identical is better than --changed because it uses md5sum
              # to compare, however there is a bug: 
              # https://bugs.launchpad.net/python-swiftclient/+bug/1379252
              # --segment-size=2g is possible with latest swiftclient master 
              # only, 2147483648 = gibibyte
-    echoerr "...uploading $src \nto /$cont/$obj, please wait..."
+    echoerr "*** uploading $src ***\n*** to /$cont/$obj ***\n please wait... "
     echoerr "executing:$swiftcmd"
     ret=`swift upload --changed --segment-size=2147483648 --header \
          "X-Object-Meta-Uploaded-by:$me" --object-name="$obj" "$cont" "$src" 1>&2`
     if [[ $? = 0 ]]; then
-      echo "$2$targ"
+      echo "/$cont/$obj"
     else
-      echoerr "error uploading $src to $2$targ"
+      echoerr "error uploading $src to /$cont/$obj"
     fi
     cd $cwd
     ;;
@@ -510,7 +527,7 @@ case "$scriptname" in
     done
     num2del=`wc -l < $TMPDIR/bulk_del.txt`
     echoerr "...deleting $num2del files under /$cont/$obj*, please wait..."
-    echoerr "...wait 10 sec then execute curl *?bulk-delete -X DELETE"
+    echoerr "...wait 10 sec then execute curl $storageurl/?bulk-delete -X DELETE"
     sleep 10
     res=`curl -H "Content-Type: text/plain"  \
          -H "X-Auth-Token: $authtoken"  \
@@ -523,7 +540,7 @@ case "$scriptname" in
     ;;
   sw-archive)
     # consider SLURM_JOB_CPUS_PER_NODE
-    echo "archive"
+    echo "sw-archive is not yet implemented"
     mydir=`swift stat "$1"`
     ;;
   sw-cat)
@@ -577,7 +594,7 @@ case "$scriptname" in
     fi
     ;;
   sw-mkdir)
-    echoerr "mkdir is not implemented as directories are created automatically"
+    echoerr "mkdir is not implemented as directories are created automatically when using sw-upload"
     ;;
   sw-cmd)
     cmddir=$(readlink -f $(dirname "$0"))
