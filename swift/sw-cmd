@@ -20,7 +20,7 @@
 
 scriptname=${0##*/}
 cwd=$(pwd)
-commands='sw-upload sw-download sw-cd sw-ls sw-list sw-rm sw-archive sw-cat sw-more sw-less sw-mkdir sw-openwith'
+commands='sw-upload sw-download sw-cd sw-ls sw-list sw-rm sw-archive sw-cat sw-more sw-less sw-mkdir sw-openwith sw-cwd'
 
 ### user definded functions ###
 echoerr(){
@@ -627,6 +627,9 @@ case "$scriptname" in
   sw-mkdir)
     echoerr "mkdir is not implemented as directories are created" \
             "automatically when using sw-upload"
+    ;;
+  sw-cwd)
+    cat ~/.swift/current_folder
     ;;
   sw-cmd)
     if [[ "`whoami`" != "root" ]]; then
