@@ -186,7 +186,7 @@ if [[ "$scriptname" != "sw-cmd" ]]; then
       elif ! [[ -z $ST_USER ]]; then
         export ST_KEY=$mypass
       else
-        echo "no credentials set"
+         echo "no credentials set"
       fi
     fi
   fi
@@ -244,16 +244,17 @@ case "$scriptname" in
     fi
     me=$(findRealUser)
     swiftcmd="swift upload --changed --segment-size=2147483648"
-    swiftcmd+=" --use-slo --segment-container=\".segments-$cont\""
+    swiftcmd+=" --use-slo --segment-container=\".segments_$cont\""
     swiftcmd+=" --header=\"X-Object-Meta-Uploaded-by:$me\" --object-name=\"$obj\" \"$cont\" \"$src\""
       # --skip-identical is better than --changed because it uses md5sum
       # to compare, however there is a bug: 
       # https://bugs.launchpad.net/python-swiftclient/+bug/1379252:
       # --segment-size=2g is possible with latest swiftclient master 
       # only, 2147483648 = gibibyte
-    echoerr "*** uploading $src ***\n*** to /$cont/$obj ***\n please wait... "
-    echoerr "*** using account ${yellow}$swiftaccount${endcolor}:"
+    echoerr "*** uploading $src ***"
+    echoerr "*** to ${yellow}$swiftaccount${endcolor}:/$cont/$obj ***"
     echoerr "executing:$swiftcmd"
+    echoerr "*** please wait... ***"
     ret=`swift upload --changed --segment-size=2147483648 \
        --use-slo --segment-container=".segments_$cont" \
        --header="X-Object-Meta-Uploaded-by:$me" --object-name="$obj" "$cont" "$src" 1>&2`
@@ -486,16 +487,22 @@ case "$scriptname" in
       echoerr "optionally filter result by search string"
       echoerr "also please check these commands:"
       echoerr $commands 
-      swift list --lh | grep -v ".trash-" | grep -v "_segments" | grep -v ".segments-"
+      swift list --lh | grep -v ".trash-" | grep -v "_segments" | grep -v ".segments_"
       exit
     fi
     dest=$1
     splitpath $dest
-    if [[ "$obj" = "" ]]; then
-      if [[ -z $2 ]]; then
-        swift list --lh "$cont"
+    #echoerr "obj:$obj"
+    #echoerr "cont:$cont"
+    if [[ -z $obj ]]; then
+      if [[ -z $cont ]]; then 
+        swift list --lh
       else
-        swift list --lh "$cont" | grep -i $2
+        if [[ -z $2 ]]; then
+          swift list --lh "$cont"
+        else
+          swift list --lh "$cont" | grep -i $2
+        fi
       fi
     else
       if [[ -z $2 ]]; then
