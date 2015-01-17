@@ -20,7 +20,7 @@
 
 scriptname=${0##*/}
 cwd=$(pwd)
-commands='sw-upload sw-download sw-cd sw-ls sw-list sw-rm sw-archive sw-cat sw-more sw-less sw-mkdir sw-openwith'
+commands='sw-upload sw-download sw-cd sw-ls sw-pwd sw-rm sw-list sw-archive sw-cat sw-more sw-less sw-mkdir sw-openwith'
 
 ### user definded functions ###
 echoerr(){
@@ -237,7 +237,14 @@ case "$scriptname" in
     fi
     pathexist "$1"
     src=${1%/}      #remove trailing slash from source
-    splitpath "$2"  
+    splitpath "$2"
+    if [[ "$cont" == "." ]]; then
+      echoerr "$cont/$obj is not a valid target name"
+      exit
+    fi
+    if [[ "$obj" == "." ]]; then
+      obj=""
+    fi
     targ=""
     if [[ "${2: -1}" = "/" || "/$cont" = "$2" ]]; then  
       # if target ends with a / or if target is a container with leading /
@@ -286,8 +293,10 @@ case "$scriptname" in
       echoerr "   ->  downloading file or directory from swift object store.\n"
       echoerr "You cannot omit <target>. If you would like to download to"
       echoerr "the current directory, please use a single dot . as target\n"
-      echoerr 'Another popular option is using the variable $TMPDIR as target' 
-      echoerr "which is currently set to $TMPDIR" 
+      echoerr 'Another popular option is using the variable $TMPDIR as target.' 
+      echoerr "If \$TMPDIR is not set at login time, $scriptname will generate"
+      echoerr "a \$TMPDIR such as $TMPDIR on the fly each time"
+      echoerr "it is run to ensure that it is empty.\n"
       echoerr "Example: $scriptname \"$1\" \$TMPDIR"
       echoerr "\nalso please check these commands:"
       echoerr $commands
@@ -344,7 +353,7 @@ case "$scriptname" in
       cd "$cwd"
       exit
     fi
-    if [[ $numobj -gt 1 ]]; then
+    if [[ $numobj -gt 1 && "$dest" != "." ]]; then
       # if target is directory move downloaded files from 
       # subdir based on --prefix up to actual target dir 
       if [[ -d "$obj" ]]; then
@@ -434,6 +443,9 @@ case "$scriptname" in
       fi
       cat ~/.swift/current_folder_$swiftaccount
     fi
+    ;;
+  sw-pwd)
+    cat ~/.swift/current_folder_$swiftaccount
     ;;
   sw-ls)
     dest="$1"
@@ -548,9 +560,10 @@ case "$scriptname" in
       echoerr "$scriptname currently does not support relative paths, path must start with '/'"
       exit 1
     fi
+    tempset
     splitpath "$dest"
     #echoerr "rm cont:$cont"
-    #echoerr "rm obj:$obj"
+    #echoerr "rm obj:$obj"      
     IFS=$'\t\n'
     if [[ "$obj" = "" ]]; then
       objlist=(`swift list "$cont"`)
@@ -566,6 +579,19 @@ case "$scriptname" in
         ret=`swift delete "$cont"`
       fi
       exit 1
+    else
+      if [[ -z $obj ]]; then
+        read -r -p "Folder /$cont has $numobj files. Really delete? [Y/N] " response
+        case "$response" in
+    	  [yY][eE][sS]|[yY]) 
+            #if yes, then execute 
+            swift delete "$cont"
+            ;;
+          *)
+            echo "aborted!"     
+        esac
+        exit 0
+      fi
     fi
     rm -f "$TMPDIR/bulk_del.txt"
     for t in "${objlist[@]}"; do
@@ -645,8 +671,24 @@ case "$scriptname" in
     fi
     ;;
   sw-mkdir)
-    echoerr "mkdir is not implemented as directories are created" \
-            "automatically when using sw-upload"
+    if [[ -z $1 ]]; then
+      echoerr "\nusage: $scriptname <folder_to_create>"
+      echoerr "     ->   creates a folder / container in swift \n"
+      echoerr "also please check these commands:"
+      echoerr $commands
+      exit 1
+    fi
+    dest="$1"
+    if [[ $dest = "/" ]]; then
+      echoerr "no need to create a root folder"
+      exit 1
+    fi
+    if [[ $dest != /* ]]; then
+      echoerr "$scriptname currently does not support relative paths, path must start with '/'"
+      exit 1
+    fi
+    splitpath "$dest"
+    ret=`swift post "$cont" 2>&1`
     ;;
   sw-cmd)
     if [[ "`whoami`" != "root" ]]; then
