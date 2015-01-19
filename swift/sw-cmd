@@ -11,16 +11,17 @@
 #  to do:
 #  * sw-download: parallel download for single multi-segment files
 #  * sw-upload: dynmically adjust --segment-size to max performance
+#  * sw-mkdir: only container is created / no pseudo folders
 #
 #  references: 
 #  * http://www.thegeekstuff.com/2010/07/bash-string-manipulation/
 #  * http://www.thegeekstuff.com/2010/06/bash-array-tutorial/ 
 #  dirkpetersen / January 2015
-#  version: 1.0
+#  version: 1.1
 
 scriptname=${0##*/}
 cwd=$(pwd)
-commands='sw-upload sw-download sw-cd sw-ls sw-pwd sw-rm sw-list sw-archive sw-cat sw-more sw-less sw-mkdir sw-openwith'
+commands='upload download cd ls pwd rm list cat more less mkdir openwith archive unarchive'
 
 ### user definded functions ###
 echoerr(){
@@ -33,12 +34,25 @@ pathexist(){
     exit
   fi
 }
+printcommands(){
+  local pref=""
+  local cmdlist=""
+  if [[ "$scriptname" == "swc" ]]; then
+    pref="swc "
+  else
+    pref="sw-"
+  fi
+  for mycmd in $commands; do
+    cmdlist+="$pref$mycmd, "
+  done
+  echo $cmdlist
+}
 argexist(){
-if [[ -z $1 ]]; then
-  echoerr "\nusage: $scriptname </file>"
+if [[ -z $1 || "$1" == "--help" ]]; then
+  echoerr "\nusage: $scriptname $subcmd </file>"
   echoerr "     ->   open file from swift object store\n"
   echoerr "also please check these commands:"
-  echoerr $commands
+  printcommands
   exit
 fi
 }
@@ -166,6 +180,14 @@ fi
 if ! hash curl 2>/dev/null; then
   echoerr "no swift client installed, please install package 'curl'"
 fi
+# check if swift commander was invoked as swc with subcommands
+subcmd=""
+selector=$scriptname
+if [[ "$scriptname" == "swc" ]]; then
+  subcmd=$1
+  selector=$subcmd
+  shift
+fi 
 
 swiftaccount=""
 swiftpassword=""
@@ -214,6 +236,8 @@ if [[ "$scriptname" != "sw-cmd" ]]; then
   checkAuthToken
 fi
 
+logger "swc ran by $USER with $@"
+
 #########  TEST ZONE  #################################
 
 #ret=`swift list something`
@@ -223,17 +247,27 @@ fi
 #exit
 # env | grep ST_
 # env | grep OS_
+if [[ "$USER" == "petersen" ]]; then
+  dummyvar=0
+fi
+
 
 ######### END TEST ZONE ###############################
 
-case "$scriptname" in
-  sw-upload)
-    if [[ -z $1 || -z $2 ]]; then
-      echoerr "\nusage: $scriptname </source> </target>"
+case "$selector" in
+  *upload | up)
+    # need to fix upload to container root
+    # one level too much
+    if [[ -z $1 || -z $2 || "$1" == "--help" ]]; then
+      echoerr "\nusage: $scriptname $subcmd </source> </target>"
       echoerr "     ->   uploading file or directory to swift object store\n"
       echoerr "also please check these commands:"
-      echoerr $commands
+      printcommands
       exit
+    fi
+    if [[ "$2" == "/" ]]; then
+      echoerr "you cannot upload to the root, please upload to a folder"
+      exit 1
     fi
     pathexist "$1"
     src=${1%/}      #remove trailing slash from source
@@ -246,19 +280,31 @@ case "$scriptname" in
       obj=""
     fi
     targ=""
-    if [[ "${2: -1}" = "/" || "/$cont" = "$2" ]]; then  
-      # if target ends with a / or if target is a container with leading /
+    if [[ "${2: -1}" = "/" || -z $obj ]]; then #
+      # if target ends with a / or if prefix is empty
       if [[ -f "$src" ]]; then # if src is a file
         targ="${1##*/}"        # extract filename from path $1
       else
-        targ=`basename "$1"`
+        if [[ "$2" != "/$cont" ]]; then #only needed if targ!=container root
+          targ=`basename "$1"`
+        fi
       fi
       obj+=$targ # append file or base dir to target
     fi
+    # check for addional meta data passed as commands
+    cmdcnt=0
+    metaheader=''
+    for myarg in "$@"; do
+      ((cmdcnt+=1))
+      if [[ $cmdcnt -ge 3 ]]; then
+        myarg=${myarg// /_}
+        metaheader+=" --header=X-Object-Meta-$myarg"
+      fi
+    done
     me=$(findRealUser)
     swiftcmd="swift upload --changed --segment-size=2147483648"
     swiftcmd+=" --use-slo --segment-container=\".segments_$cont\""
-    swiftcmd+=" --header=\"X-Object-Meta-Uploaded-by:$me\" --object-name=\"$obj\" \"$cont\" \"$src\""
+    swiftcmd+=" --header=\"X-Object-Meta-Uploaded-by:$me\"$metaheader --object-name=\"$obj\" \"$cont\" \"$src\""
       # --skip-identical is better than --changed because it uses md5sum
       # to compare, however there is a bug: 
       # https://bugs.launchpad.net/python-swiftclient/+bug/1379252:
@@ -267,10 +313,10 @@ case "$scriptname" in
     echoerr "*** uploading $src ***"
     echoerr "*** to ${yellow}$swiftaccount${endcolor}:/$cont/$obj ***"
     echoerr "executing:$swiftcmd"
-    echoerr "*** please wait... ***"
+    echoerr "*** please wait... ***"    
     ret=`swift upload --changed --segment-size=2147483648 \
        --use-slo --segment-container=".segments_$cont" \
-       --header="X-Object-Meta-Uploaded-by:$me" --object-name="$obj" "$cont" "$src" 1>&2`
+       --header="X-Object-Meta-Uploaded-by:$me"$metaheader --object-name="$obj" "$cont" "$src" 1>&2`
     retcode=$?
     if [[ $retcode = 0 ]]; then
       echo "/$cont/$obj"
@@ -279,32 +325,34 @@ case "$scriptname" in
     fi
     cd $cwd
     ;;
-  sw-download)
-    if [[ -z "$1" ]]; then
-      echoerr "\nusage: $scriptname <source> <target>"
+  *download | down)
+    if [[ -z "$1" || "$1" == "--help" ]]; then
+      echoerr "\nusage: $scriptname $subcmd <source> <target>"
       echoerr "   ->  downloading file or directory from swift object store\n"
       echoerr "also please check these commands:"
-      echoerr $commands
+      printcommands
       exit
     fi
     tempset
-    if [[ -z "$2" ]]; then
-      echoerr "\nusage: $scriptname <source> <target>"
+    if [[ -z $2 ]]; then
+      echoerr "\nusage: $scriptname $subcmd <source> <target>"
       echoerr "   ->  downloading file or directory from swift object store.\n"
       echoerr "You cannot omit <target>. If you would like to download to"
       echoerr "the current directory, please use a single dot . as target\n"
       echoerr 'Another popular option is using the variable $TMPDIR as target.' 
-      echoerr "If \$TMPDIR is not set at login time, $scriptname will generate"
+      echoerr "If \$TMPDIR is not set at login time, $scriptname $subcmd can generate"
       echoerr "a \$TMPDIR such as $TMPDIR on the fly each time"
-      echoerr "it is run to ensure that it is empty.\n"
-      echoerr "Example: $scriptname \"$1\" \$TMPDIR"
+      echoerr "it is run to ensure that it is empty. Use string SWCTMP as target.\n"
+      echoerr "Examples:"
+      echoerr "$scriptname $subcmd \"$1\" \$TMPDIR (if TMPDIR is already set)"
+      echoerr "$scriptname $subcmd \"$1\" SWCTMP (if swc needs to set TMPDIR)"
       echoerr "\nalso please check these commands:"
-      echoerr $commands
+      printcommands
       exit
     fi
     splitpath "$1"
     dest="$2"
-    if [[ -z $2 ]]; then
+    if [[ "$2" == SWCTMP ]]; then
       dest=$TMPDIR
     fi
     IFS=$'\t\n'
@@ -371,12 +419,12 @@ case "$scriptname" in
     fi
     cd "$cwd"
     ;;
-  sw-cd)
-    if [[ -z $1 ]]; then
-      echoerr "\nusage: $scriptname <folder>"
+  *cd)
+    if [[ -z $1 || "$1" == "--help" ]]; then
+      echoerr "\nusage: $scriptname $subcmd <folder>"
       echoerr "     ->   change current folder in swift object store\n"
       echoerr "also please check these commands:"
-      echoerr $commands
+      printcommands
       exit
     fi
     splitpath "$1"
@@ -444,10 +492,14 @@ case "$scriptname" in
       cat ~/.swift/current_folder_$swiftaccount
     fi
     ;;
-  sw-pwd)
+  *pwd)
     cat ~/.swift/current_folder_$swiftaccount
     ;;
-  sw-ls)
+  *ls)
+    if [[ "$1" == "--help" ]]; then
+      echoerr "list contents of a folder"
+      exit
+    fi
     dest="$1"
     if ! [[ -z $dest ]]; then
       dummy=`sw-cd "$1"`
@@ -511,13 +563,13 @@ case "$scriptname" in
     echoerr "current folder:"
     echo "$cur_fld"
     ;;
-  sw-list)
-    if [[ -z $1 ]]; then
-      echoerr "\nusage: $scriptname </path> [search string]"
+  *list)
+    if [[ -z $1 || "$1" == "--help" ]]; then
+      echoerr "\nusage: $scriptname $subcmd </path> [search string]"
       echoerr "     ->   list all folders/files below path\n"
       echoerr "optionally filter result by search string"
       echoerr "also please check these commands:"
-      echoerr $commands 
+      printcommands 
       swift list --lh | grep -v ".trash-" | grep -v "_segments" | grep -v ".segments_"
       exit
     fi
@@ -543,12 +595,12 @@ case "$scriptname" in
       fi
     fi
     ;;
-  sw-rm)  
-    if [[ -z $1 ]]; then
-      echoerr "\nusage: $scriptname <path_to_delete>"
+  *rm)  
+    if [[ -z $1 || "$1" == "--help" ]]; then
+      echoerr "\nusage: $scriptname $subcmd <path_to_delete>"
       echoerr "     ->   delete files/objects from swift\n"      
       echoerr "also please check these commands:"
-      echoerr $commands
+      printcommands
       exit 1
     fi
     dest="$1"
@@ -557,7 +609,7 @@ case "$scriptname" in
       exit 1
     fi
     if [[ $dest != /* ]]; then
-      echoerr "$scriptname currently does not support relative paths, path must start with '/'"
+      echoerr "$scriptname $subcmd currently does not support relative paths, path must start with '/'"
       exit 1
     fi
     tempset
@@ -615,14 +667,14 @@ case "$scriptname" in
     fi
     echoerr ${res%%Response*}
     ;;
-  sw-archive)
+  *archive)
     # consider SLURM_JOB_CPUS_PER_NODE
     echo "sw-archive is not yet implemented"
     mydir=`swift stat "$1"`
     ;;
-  sw-cat)
+  *cat)
     argexist $1
-    myfile=`sw-download "$1"`
+    myfile=`sw-download "$1" $TMPDIR`
     if [[ -d "$myfile" ]]; then
       echoerr "\n$1 is not a single file, multiple files " \
               "were downloaded and saved in\n"
@@ -631,9 +683,9 @@ case "$scriptname" in
       cat "$myfile"
     fi
     ;;
-  sw-more)
+  *more)
     argexist $1
-    myfile=`sw-download "$1"`
+    myfile=`sw-download "$1" $TMPDIR`
     if [[ -d "$myfile" ]]; then
       echoerr "\n$1 is not a single file, multiple files " \
               "were downloaded and saved in\n"
@@ -642,9 +694,9 @@ case "$scriptname" in
       more "$myfile"
     fi
     ;;
-  sw-less)
+  *less)
     argexist $1
-    myfile=`sw-download "$1"`
+    myfile=`sw-download "$1" $TMPDIR`
     if [[ -d "$myfile" ]]; then
       echoerr "\n$1 is not a single file, multiple files " \
               "were downloaded and saved in\n"
@@ -653,15 +705,15 @@ case "$scriptname" in
       less "$myfile"
     fi
     ;;
-  sw-openwith)
+  *openwith)
      if [[ -z $1 || -z $2 ]]; then
-      echoerr "\nusage: $scriptname <application> </file or /folder>"
+      echoerr "\nusage: $scriptname $subcmd <application> </file or /folder>"
       echoerr "     ->   open file from swift object store with application\n"
       echoerr "also please check these commands:"
-      echoerr $commands
+      printcommands
       exit
     fi
-    myfile=`sw-download "$2"`
+    myfile=`sw-download "$2" $TMPDIR`
     if [[ -d "$myfile" ]]; then
       echoerr "\n$2 is not a single file, multiple files " \
               "were downloaded and saved in\n"
@@ -670,12 +722,12 @@ case "$scriptname" in
       $1 "$myfile"
     fi
     ;;
-  sw-mkdir)
+  *mkdir)
     if [[ -z $1 ]]; then
-      echoerr "\nusage: $scriptname <folder_to_create>"
+      echoerr "\nusage: $scriptname $subcmd <folder_to_create>"
       echoerr "     ->   creates a folder / container in swift \n"
       echoerr "also please check these commands:"
-      echoerr $commands
+      printcommands
       exit 1
     fi
     dest="$1"
@@ -684,7 +736,7 @@ case "$scriptname" in
       exit 1
     fi
     if [[ $dest != /* ]]; then
-      echoerr "$scriptname currently does not support relative paths, path must start with '/'"
+      echoerr "$scriptname $subcmd currently does not support relative paths, path must start with '/'"
       exit 1
     fi
     splitpath "$dest"
@@ -704,18 +756,34 @@ case "$scriptname" in
     fi
     cmddir=$(readlink -f $(dirname "$0"))
     echoerr "creating symlinks for sw-cmd tool collection in $cmddir:"
-    echoerr $commands
+    printcommands
     cd $cmddir
     for mycmd in $commands; do
-      rm -f $mycmd
-      ln -s sw-cmd $mycmd
+      rm -f sw-$mycmd
+      ln -s sw-cmd sw-$mycmd
     done
     cd $cwd
     echoerr "Done."
     ;;
   *)
-    #echo "this script is an alias or a copy of sw-cmd, however $scriptname is currently not supported"
-    #echoerr ""
+    #echo "this script is an alias or a copy of sw-cmd, however $scriptname $subcmd is currently not supported"
+    echoerr "\nSwift Commander (swc) allows you to easily work with a swift object store."
+    echoerr "swc supports sub commands that attempt to mimic standard unix file system tools."
+    echoerr "These sub commands are currently implemented: (Arguments in sqare brackts are "
+    echoerr "optional).\n"
+    echoerr "  $scriptname upload <src> <targ>   -  copy file / dirs from a file system to swift"
+    echoerr "  $scriptname download <src> <targ> -  copy files and dirs from swift to a file system" 
+    echoerr "  $scriptname cd <folder>           -  change current folder to <folder> in swift"
+    echoerr "  $scriptname ls [folder]           -  list contents of a folder"
+    echoerr "  $scriptname pwd                   -  display the current swift folder name" 
+    echoerr "  $scriptname rm <path>             -  delete all file paths that start with <path>"
+    echoerr "  $scriptname cat <file>            -  download a file to TMPDIR and open it with cat"
+    echoerr "  $scriptname more <file>           -  download a file to TMPDIR and open it with more"
+    echoerr "  $scriptname less <file>           -  download a file to TMPDIR and open it with less"
+    echoerr "  $scriptname mkdir <folder>        -  create a folder (works only at the root)"
+    echoerr "  $scriptname list <folder> [filt]  -  list folder content (incl. subfolders) and filter"     
+    echoerr "  $scriptname openwith <cmd> <file> -  download a file to TMPDIR and open it with <cmd>" 
+    echoerr "  $scriptname archive <src> <targ>  -  create one tar archive for each folder level" 
+    echoerr "  $scriptname unarch <src> <targ>   -  restore folders that have been archived\n"   
     ;;
 esac
-
