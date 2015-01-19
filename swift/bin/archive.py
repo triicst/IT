@@ -28,7 +28,6 @@ def upload_file_to_swift(filename,swiftname,container,swift_conn):
 
 def archive_tar_file(src_path,file_list,container,swift_conn):
    global tar_suffix
-   global unique
 
    # archive_name is name for archived object
    archive_name=src_path+tar_suffix
@@ -52,19 +51,15 @@ def archive_to_swift(local_dir,container,swift_conn,no_hidden):
          archive_tar_file(dir_name,file_list,container,swift_conn)
 
 # parse name into directory tree
-# assume only terminal node has tar_suffix
 def create_local_path(local_dir,archive_name):
    global tar_suffix
 
-   path=local_dir
-   for item in archive_name.split('/'):
-      if item.endswith(tar_suffix):
-         item=item[:-len(tar_suffix)]
+   path=os.path.join(local_dir,archive_name)
+   if path.endswith(tar_suffix):
+      path=path[:-len(tar_suffix)]
 
-      path=os.path.join(path,item)
- 
    os.makedirs(path)
-
+   
    return path
 
 def extract_to_local(local_dir,container,swift_conn,no_hidden):
