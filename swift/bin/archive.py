@@ -52,7 +52,7 @@ def archive_to_swift(local_dir,container,swift_conn,no_hidden):
          archive_tar_file(dir_name,file_list,container,swift_conn)
 
 # parse name into directory tree
-# if directory nodes don't already exist, create
+# assume only terminal node has tar_suffix
 def create_local_path(local_dir,archive_name):
    global tar_suffix
 
@@ -62,8 +62,8 @@ def create_local_path(local_dir,archive_name):
          item=item[:-len(tar_suffix)]
 
       path=os.path.join(path,item)
-      if not os.path.exists(path):
-         os.makedirs(path)
+ 
+   os.makedirs(path)
 
    return path
 
