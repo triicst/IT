@@ -6,6 +6,8 @@ import swiftclient
 
 import subprocess
 
+import getpass
+
 # suffix of archive files
 tar_suffix=".tar.gz"
 
@@ -23,8 +25,20 @@ def create_tar_file(filename,src_path,file_list):
          tar.add(os.path.join(src_path,file),file)
 
 def upload_file_to_swift(filename,swiftname,container,swift_conn):
-   with open(filename,'rb') as localfile:
-      swift_conn.put_object(container,swiftname,localfile)
+   # call "swift upload" if file size is greater than upload_threshold
+   upload_threshold=1000000
+
+   if os.stat(filename).st_size>upload_threshold:
+      subprocess.call(["swift","upload",
+         "--object-name="+swiftname,
+         "--segment-size=2147483648",
+         "--use-slo",
+         "--segment-container=.segments_testing",
+         "--header=X-Object-Meta-Uploaded-by:"+getpass.getuser(),
+         container,filename])
+   else:
+      with open(filename,'rb') as localfile:
+         swift_conn.put_object(container,swiftname,localfile)
 
 def archive_tar_file(src_path,file_list,container,swift_conn):
    global tar_suffix
@@ -92,8 +106,8 @@ def usage():
    print("Parameters:")
    print("\t-l local_directory (default .)")
    print("\t-c container (required)")
-   print("\t-n (no hidden directories)")
    print("\t-x (extract from container to local directory)")
+   print("\t-n (no hidden directories)")
 
 def validate_dir(path,param):
    if not os.path.isdir(path):
