@@ -133,6 +133,29 @@ def create_local_path(local_dir,archive_name):
    
    return path
 
+def extract_to_local(local_dir,container,no_hidden,swift_conn):
+   global tar_suffix
+
+   try: 
+      headers,objs=swift_conn.get_container(container)
+      for obj in objs:
+         if obj['name'].endswith(tar_suffix):
+            if no_hidden and is_hidden_dir(obj['name']):
+               continue
+
+            term_path=create_local_path(local_dir,obj['name'])
+
+            # download tar file and extract into terminal directory
+            temp_file=str(os.getpid())+tar_suffix
+            sw_download("--output="+temp_file,container,obj['name'])
+
+            with tarfile.open(temp_file,"r:gz") as tar:
+               tar.extractall(path=term_path)
+
+            os.unlink(temp_file)
+   except ClientException:
+      print("Error: cannot access Swift container '%s'!" % container)
+
 def create_sw_conn():
    swift_auth=os.environ.get("ST_AUTH")
    swift_user=os.environ.get("ST_USER")
@@ -142,33 +165,6 @@ def create_sw_conn():
       return Connection(authurl=swift_auth,user=swift_user,key=swift_key)
 
    print("Error: Swift environment not configured!")
-
-def extract_to_local(local_dir,container,no_hidden):
-   global tar_suffix
-
-   swift_conn=create_sw_conn()
-   if swift_conn:
-      try: 
-         headers,objs=swift_conn.get_container(container)
-         for obj in objs:
-            if obj['name'].endswith(tar_suffix):
-               if no_hidden and is_hidden_dir(obj['name']):
-                  continue
-
-               term_path=create_local_path(local_dir,obj['name'])
-
-               # download tar file and extract into terminal directory
-               temp_file=str(os.getpid())+tar_suffix
-               sw_download("--output="+temp_file,container,obj['name'])
-
-               with tarfile.open(temp_file,"r:gz") as tar:
-                  tar.extractall(path=term_path)
-
-               os.unlink(temp_file)
-      except ClientException:
-         print("Error: cannot access Swift container '%s'!" % container)
-
-      swift_conn.close()
 
 def usage():
    print("archive [parameters]")
@@ -216,7 +212,10 @@ def main(argv):
       usage()
    else:
       if extract:
-         extract_to_local(local_dir,container,no_hidden)
+         swift_conn=create_sw_conn()
+         if swift_conn:
+            extract_to_local(local_dir,container,no_hidden,swift_conn)
+            swift_conn.close()
       else:
          sw_post(container)
          archive_to_swift(local_dir,container,no_hidden)
