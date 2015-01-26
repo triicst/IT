@@ -96,13 +96,15 @@ def upload_file_to_swift(filename,swiftname,container):
       "--header=X-Object-Meta-Uploaded-by:"+getpass.getuser(),
       container,filename)
 
-def archive_tar_file(src_path,file_list,container):
+def archive_tar_file(src_path,file_list,container,tmp_dir):
    global tar_suffix
 
    # archive_name is name for archived object
    archive_name=src_path+tar_suffix
    # temp_archive_name is name of local tar file
    temp_archive_name=str(os.getpid())+os.path.basename(archive_name)
+   if tmp_dir:
+      temp_archive_name=os.path.join(tmp_dir,temp_archive_name)
   
    # Create local tar file 
    create_tar_file(temp_archive_name,src_path,file_list)
@@ -114,11 +116,11 @@ def archive_tar_file(src_path,file_list,container):
    os.unlink(temp_archive_name)
 
 # walk directory from current
-def archive_to_swift(local_dir,container,no_hidden):
+def archive_to_swift(local_dir,container,no_hidden,tmp_dir):
    for dir_name, subdir_list, file_list in os.walk(local_dir):
       rel_path=os.path.relpath(dir_name)
       if (not (no_hidden and is_hidden_dir(rel_path)) and file_list):
-         archive_tar_file(dir_name,file_list,container)
+         archive_tar_file(dir_name,file_list,container,tmp_dir)
 
 # parse name into directory tree
 def create_local_path(local_dir,archive_name):
@@ -133,7 +135,7 @@ def create_local_path(local_dir,archive_name):
    
    return path
 
-def extract_to_local(local_dir,container,no_hidden,swift_conn):
+def extract_to_local(local_dir,container,no_hidden,swift_conn,tmp_dir):
    global tar_suffix
 
    try: 
@@ -147,6 +149,9 @@ def extract_to_local(local_dir,container,no_hidden,swift_conn):
 
             # download tar file and extract into terminal directory
             temp_file=str(os.getpid())+tar_suffix
+            if tmp_dir:
+               temp_file=os.path.join(tmp_dir,temp_file)
+
             sw_download("--output="+temp_file,container,obj['name'])
 
             with tarfile.open(temp_file,"r:gz") as tar:
@@ -173,6 +178,7 @@ def usage():
    print("\t-c container (required)")
    print("\t-x (extract from container to local directory)")
    print("\t-n (no hidden directories)")
+   print("\t-t temp_dir (directory for temp files)")
 
 def validate_dir(path,param):
    if not os.path.isdir(path):
@@ -186,11 +192,12 @@ def main(argv):
    local_dir="."
    # default container is invalid
    container=""
+   temp_dir=""
    extract=False
    no_hidden=False
 
    try:
-      opts,args=getopt.getopt(argv,"l:c:xnh")
+      opts,args=getopt.getopt(argv,"l:c:t:xnh")
    except getopt.GetoptError:
       usage()
       sys.exit()
@@ -203,6 +210,8 @@ def main(argv):
          local_dir=validate_dir(arg,"local")
       elif opt in ("-c"): # set container
          container=arg
+      elif opt in ("-t"): # temp file directory
+         tmp_dir=validate_dir(arg,"tmp_dir")
       elif opt in ("-x"): # extract mode
          extract=True
       elif opt in ("-n"): # set no-hidden flag to skip .*
@@ -214,11 +223,11 @@ def main(argv):
       if extract:
          swift_conn=create_sw_conn()
          if swift_conn:
-            extract_to_local(local_dir,container,no_hidden,swift_conn)
+            extract_to_local(local_dir,container,no_hidden,swift_conn,tmp_dir)
             swift_conn.close()
       else:
          sw_post(container)
-         archive_to_swift(local_dir,container,no_hidden)
+         archive_to_swift(local_dir,container,no_hidden,tmp_dir)
 
 if __name__=="__main__":
    main(sys.argv[1:])
