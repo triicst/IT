@@ -1,0 +1,126 @@
+#! /bin/bash
+
+# configure and mount s3ql file system with local swift cluster
+
+swiftCreds() {
+  if ! [[ -z $OS_USERNAME ]]; then
+    swiftaccount=$OS_USERNAME
+    swiftpassword=$OS_PASSWORD
+    swiftauthurl=$OS_AUTH_URL
+  elif ! [[ -z $ST_USER ]]; then
+    swiftaccount=$ST_USER
+    swiftpassword=$ST_KEY
+    swiftauthurl=$ST_AUTH
+  else
+    swiftauthurl=$ST_AUTH
+  fi
+}
+
+swiftCreds
+user=`whoami`
+scriptname=${0##*/}
+
+if ! hash mount.s3ql 2>/dev/null; then
+  echo "s3ql file system not installed, please ask your system adminstrator to run these commands:"
+  echo "sudo apt-get install software-properties-common python-software-properties"
+  echo "sudo add-apt-repository ppa:nikratio/s3ql"
+  echo "sudo apt-get update && apt-get -y install s3ql"
+  exit 1
+fi
+
+if [[ -z $swiftaccount ]]; then
+  echo " *** Swift credentials not set. ***"
+  echo "Please execute 'sw2account <accountname>' to get credentials."
+  echo "Use 'sw2account --save <accountname>' to set them as default."
+  echo "  Example: sw2account lastname_f"
+  echo "If the 'sw2account' command does not exist please ask your"
+  echo "local System Administrator to install swift-switch-account."
+  exit 1
+fi
+
+fstype=`stat -f -L -c %T ~/`
+if [[ $fstype == "nfs" ]]; then
+  echo "The home directory of user $user is nfs mounted. This is not supported."
+  echo "Please run this script as a user that has a local home directory"
+  exit 1
+fi
+
+if [ -d $MODULESHOME ]; then
+  module load python2 > /dev/null 2>&1
+fi
+
+if ! hash swift 2>/dev/null; then
+  echo "swift client is not installed. please ask your system adminstrator to install python-swiftclient"
+fi
+
+container=$1
+if [[ -z $1 ]]; then
+  container="s3ql"
+  read -r -p "Do you want to mount default container $container from swift account $swiftaccount ? [Y/N] " response
+  case "$response" in
+    [yY][eE][sS]|[yY])
+      echo "using default container name 's3ql'"
+      ;;
+    *)
+      echo "please call $scriptname [container] to create and mount a container with a different name."
+      exit
+  esac
+  echo "using default container name 's3ql'"
+fi
+compress="--compress=zlib-6"
+if ! [[ -z $2 ]]; then
+  compress="--compress=$2"
+  echo "using compression $2"
+fi
+
+authinf="authinfo2_"$swiftaccount
+authinf="$authinf"_$container
+
+#echo "authinf:$authinf"
+#echo "swiftaccount:$swiftaccount"
+#echo "container:$container"
+
+echo "creating container $container ..."
+swift post $container
+
+s3qlurl=${swiftauthurl/"https://"/"swift://"}
+s3qlurl=${s3qlurl/"/auth/v1.0"/":443/$container"}
+shortaccount=${swiftaccount/"Swift_"/""}
+
+echo "using swift url: $s3qlurl"
+echo "writing credentials for $swiftaccount to: ~/.s3ql/$authinf"
+mkdir -p ~/.s3ql
+echo "[swift]" > ~/.s3ql/$authinf
+echo "storage-url: $s3qlurl" >> ~/.s3ql/$authinf
+echo "backend-login: $swiftaccount" >> ~/.s3ql/$authinf
+echo "backend-password: $swiftpassword" >> ~/.s3ql/$authinf
+chmod 600 ~/.s3ql/$authinf
+
+allow_other=""
+if [[ "$user" == "root" ]]; then
+  allow_other="--allow-other"
+fi
+
+echo "...running mkfs.s3ql --max-obj-size=128000 --authfile ~/.s3ql/$authinf --plain $s3qlurl"
+mkfs.s3ql --max-obj-size=128000 --authfile ~/.s3ql/$authinf --plain $s3qlurl
+echo "...running fsck.s3ql --debug --authfile ~/.s3ql/$authinf $s3qlurl"
+fsck.s3ql --debug --authfile ~/.s3ql/$authinf $s3qlurl
+mkdir -p /mnt/tin/$shortaccount/$container
+
+cachedir=""
+if [[ -d /loc/ssd ]]; then
+  cachedir="--cachedir=/loc/ssd/.s3ql"
+  mkdir -p /loc/ssd/.s3ql
+elif [[ -d /loc ]]; then
+  cachedir="--cachedir=/loc/.s3ql"
+  mkdir -p /loc/.s3ql
+fi
+
+echo "...running mount.s3ql --authfile ~/.s3ql/$authinf $allow_other $compress $cachedir --metadata-upload-interval 21600 $s3qlurl /mnt/tin/$shortaccount/$container"
+mount.s3ql --authfile ~/.s3ql/$authinf $allow_other $compress $cachedir --metadata-upload-interval 21600 $s3qlurl /mnt/tin/$shortaccount/$container
+
+echo -e "\nto unmount use this command:"
+echo "umount.s3ql /mnt/tin/$shortaccount/$container"
+
+
+
