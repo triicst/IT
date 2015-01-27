@@ -192,7 +192,7 @@ def main(argv):
    local_dir="."
    # default container is invalid
    container=""
-   temp_dir=""
+   tmp_dir=""
    extract=False
    no_hidden=False
 
