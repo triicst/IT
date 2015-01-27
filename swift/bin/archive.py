@@ -116,11 +116,41 @@ def archive_tar_file(src_path,file_list,container,tmp_dir):
    os.unlink(temp_archive_name)
 
 # walk directory from current
-def archive_to_swift(local_dir,container,no_hidden,tmp_dir):
+def archive_to_swift(local_dir,container,no_hidden,tmp_dir,bundle):
+   global tar_suffix
+
+   current_bundle=0
+   current_bundle_id=0
+
    for dir_name, subdir_list, file_list in os.walk(local_dir):
       rel_path=os.path.relpath(dir_name)
       if (not (no_hidden and is_hidden_dir(rel_path)) and file_list):
-         archive_tar_file(dir_name,file_list,container,tmp_dir)
+         if not bundle:
+            archive_tar_file(dir_name,file_list,container,tmp_dir)
+         else:
+            for filename in file_list:
+               full_name=os.path.join(rel_path,filename)
+               file_size=os.path.getsize(full_name)
+               if (current_bundle-file_size)<0:
+                  if current_bundle:
+                     tar.close()
+                     upload_file_to_swift(tar_name,tar_name,container)
+                     os.unlink(tar_name)
+                     current_bundle_id=current_bundle_id+1
+
+                  tar_name="bundle"+str(current_bundle_id)+tar_suffix
+                  tar=tarfile.open(tar_name,"w:gz")
+                  current_bundle=bundle
+               
+               current_bundle=current_bundle-file_size
+
+               # add file to current bundle
+               tar.add(full_name,full_name)
+
+   if current_bundle_id:
+      tar.close()
+      upload_file_to_swift(tar_name,tar_name,container)
+      os.unlink(tar_name)
 
 # parse name into directory tree
 def create_local_path(local_dir,archive_name):
@@ -135,7 +165,7 @@ def create_local_path(local_dir,archive_name):
    
    return path
 
-def extract_to_local(local_dir,container,no_hidden,swift_conn,tmp_dir):
+def extract_to_local(local_dir,container,no_hidden,swift_conn,tmp_dir,bundle):
    global tar_suffix
 
    try: 
@@ -145,7 +175,10 @@ def extract_to_local(local_dir,container,no_hidden,swift_conn,tmp_dir):
             if no_hidden and is_hidden_dir(obj['name']):
                continue
 
-            term_path=create_local_path(local_dir,obj['name'])
+            if bundle:
+               term_path=local_dir
+            else:
+               term_path=create_local_path(local_dir,obj['name'])
 
             # download tar file and extract into terminal directory
             temp_file=str(os.getpid())+tar_suffix
@@ -179,6 +212,7 @@ def usage():
    print("\t-x (extract from container to local directory)")
    print("\t-n (no hidden directories)")
    print("\t-t temp_dir (directory for temp files)")
+   print("\t-b bundle_size (in M or G)")
 
 def validate_dir(path,param):
    if not os.path.isdir(path):
@@ -187,17 +221,31 @@ def validate_dir(path,param):
 
    return(path)
 
+def validate_bundle(arg):
+   last=arg[-1].upper()
+   if last=='M':
+      bundle=int(arg[:-1])*1000000
+   elif last=='G':
+      bundle=int(arg[:-1])*1000000000
+   elif last.isdigit():
+      bundle=int(arg)
+   else:
+       print("Error: illegal bundle suffix '%c'" % last)
+       sys.exit()
+
+   return bundle
+
 # Fix now unneeded dest param
 def main(argv):
    local_dir="."
-   # default container is invalid
    container=""
    tmp_dir=""
    extract=False
    no_hidden=False
+   bundle=0
 
    try:
-      opts,args=getopt.getopt(argv,"l:c:t:xnh")
+      opts,args=getopt.getopt(argv,"l:c:t:b:xnh")
    except getopt.GetoptError:
       usage()
       sys.exit()
@@ -212,6 +260,8 @@ def main(argv):
          container=arg
       elif opt in ("-t"): # temp file directory
          tmp_dir=validate_dir(arg,"tmp_dir")
+      elif opt in ("-b"): # bundle size
+         bundle=validate_bundle(arg)
       elif opt in ("-x"): # extract mode
          extract=True
       elif opt in ("-n"): # set no-hidden flag to skip .*
@@ -223,11 +273,11 @@ def main(argv):
       if extract:
          swift_conn=create_sw_conn()
          if swift_conn:
-            extract_to_local(local_dir,container,no_hidden,swift_conn,tmp_dir)
+            extract_to_local(local_dir,container,no_hidden,swift_conn,tmp_dir,bundle)
             swift_conn.close()
       else:
          sw_post(container)
-         archive_to_swift(local_dir,container,no_hidden,tmp_dir)
+         archive_to_swift(local_dir,container,no_hidden,tmp_dir,bundle)
 
 if __name__=="__main__":
    main(sys.argv[1:])
