@@ -172,13 +172,11 @@ def archive_to_swift_bundle(local_dir,container,no_hidden,tmp_dir,bundle):
 
          if bundle_state and is_child_or_sib(dir_name,last_dir):
             bundle_state=bundle_state+dir_size
+            append_bundle(tar,dir_name,file_list)
+
             if bundle_state>=bundle:
-               bundle_state=0
-               append_bundle(tar,dir_name,file_list)
                end_bundle(tar,current_bundle,a_name,container)
-            else:
-               append_bundle(tar,dir_name,file_list)
-               #print("%s: in bundle @ %d" % (dir_name,dir_size))
+               bundle_state=0
          else:
             if bundle_state:
                end_bundle(tar,current_bundle,a_name,container)
@@ -227,12 +225,12 @@ def extract_to_local(local_dir,container,no_hidden,swift_conn,tmp_dir):
 
             # if bundle, extract using tar embedded paths
             if obj['name'].endswith(bundle_id+tar_suffix):
-               with tarfile.open(temp_file,"r:gz") as tar:
-                  tar.extractall(path=local_dir)
+               term_path=local_dir
             else:
                term_path=create_local_path(local_dir,obj['name'])
-               with tarfile.open(temp_file,"r:gz") as tar:
-                  tar.extractall(path=term_path)
+
+            with tarfile.open(temp_file,"r:gz") as tar:
+               tar.extractall(path=term_path)
 
             os.unlink(temp_file)
    except ClientException:
