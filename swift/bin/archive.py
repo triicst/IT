@@ -13,12 +13,16 @@ from swiftclient import RequestException
 from swiftclient.exceptions import ClientException
 from swiftclient.multithreading import OutputManager
 
+swift_auth=os.environ.get("ST_AUTH")
+
 # define minimum parser object to allow swiftstack shell to run 
 def shell_minimal_options():
+   global swift_auth
+
    parser = optparse.OptionParser()
 
    parser.add_option('-A', '--auth', dest='auth',
-      default=os.environ.get('ST_AUTH'))
+      default=swift_auth)
    parser.add_option('-V', '--auth-version',
       default=os.environ.get('ST_AUTH_VERSION',
          (os.environ.get('OS_AUTH_VERSION','1.0'))))
@@ -237,7 +241,8 @@ def extract_to_local(local_dir,container,no_hidden,swift_conn,tmp_dir):
       print("Error: cannot access Swift container '%s'!" % container)
 
 def create_sw_conn():
-   swift_auth=os.environ.get("ST_AUTH")
+   global swift_auth
+
    swift_user=os.environ.get("ST_USER")
    swift_key=os.environ.get("ST_KEY")
 
@@ -255,6 +260,7 @@ def usage():
    print("\t-n (no hidden directories)")
    print("\t-t temp_dir (directory for temp files)")
    print("\t-b bundle_size (in M or G)")
+   print("\t-a auth_token (default from ST_AUTH)")
 
 def validate_dir(path,param):
    if not os.path.isdir(path):
@@ -279,6 +285,8 @@ def validate_bundle(arg):
 
 # Fix now unneeded dest param
 def main(argv):
+   global swift_auth
+
    local_dir="."
    container=""
    tmp_dir=""
@@ -287,7 +295,7 @@ def main(argv):
    bundle=0
 
    try:
-      opts,args=getopt.getopt(argv,"l:c:t:b:xnh")
+      opts,args=getopt.getopt(argv,"l:c:t:b:a:xnh")
    except getopt.GetoptError:
       usage()
       sys.exit()
@@ -304,6 +312,8 @@ def main(argv):
          tmp_dir=validate_dir(arg,"tmp_dir")
       elif opt in ("-b"): # bundle size
          bundle=validate_bundle(arg)
+      elif opt in ("-a"): # override auth_token
+         swift_auth=arg
       elif opt in ("-x"): # extract mode
          extract=True
       elif opt in ("-n"): # set no-hidden flag to skip .*
