@@ -105,12 +105,12 @@ def append_bundle(tar,src_path,file_list):
    for file in file_list:
       tar.add(os.path.join(src_path,file))
 
-def start_bundle(src_path,file_list,tmp_dir,prefix):
+def start_bundle(src_path,file_list,tmp_dir,pre_path):
    global tar_suffix
    global bundle_id
 
    # archive_name is name for archived object
-   archive_name=os.path.join(prefix,src_path+bundle_id+tar_suffix)
+   archive_name=pre_path+bundle_id+tar_suffix
    # temp_archive_name is name of local tar file
    temp_archive_name=str(os.getpid())+os.path.basename(archive_name)
    if tmp_dir:
@@ -131,11 +131,11 @@ def end_bundle(tar,bundle_name,archive_name,container):
 
    os.unlink(bundle_name)
 
-def archive_tar_file(src_path,file_list,container,tmp_dir,prefix):
+def archive_tar_file(src_path,file_list,container,tmp_dir,pre_path):
    global tar_suffix
 
    # archive_name is name for archived object
-   archive_name=os.path.join(prefix,src_path+tar_suffix)
+   archive_name=pre_path+tar_suffix
    # temp_archive_name is name of local tar file
    temp_archive_name=str(os.getpid())+os.path.basename(archive_name)
    if tmp_dir:
@@ -171,7 +171,7 @@ def archive_to_swift_bundle(local_dir,container,no_hidden,tmp_dir,bundle,
    last_dir=""
 
    for dir_name, subdir_list, file_list in os.walk(local_dir):
-      rel_path=os.path.relpath(dir_name)
+      rel_path=os.path.relpath(dir_name,local_dir)
       if (not (no_hidden and is_hidden_dir(rel_path)) and file_list):
          dir_size=flat_dir_size(dir_name,file_list)
 
@@ -188,13 +188,14 @@ def archive_to_swift_bundle(local_dir,container,no_hidden,tmp_dir,bundle,
 
             if dir_size<bundle:
                current_bundle,a_name,tar=start_bundle(dir_name,file_list,
-                  tmp_dir,prefix)
+                  tmp_dir,os.path.join(prefix,rel_path))
                #print("%s: start bundle %s @ %d" % 
                #   (dir_name,current_bundle,dir_size))
                bundle_state=dir_size
             else:
                #print("%s: not in bundle @ %d" % (dir_name,dir_size))
-               archive_tar_file(dir_name,file_list,container,tmp_dir,prefix)
+               archive_tar_file(dir_name,file_list,container,tmp_dir,
+                  os.path.join(prefix,rel_path))
                bundle_state=0
 
          last_dir=dir_name
