@@ -25,7 +25,23 @@ protected_users = (
     'www-data', 'landscape', 'sshd', 'man', 'klog',
 )
 
-cmd = [ 'squeue', '-a', '-h', '-w', socket.gethostname(), '-o', '%u']
+# find all the nodes configured on this host when
+# multiple slurmd's are running
+
+cmd = [ 'scontrol', 'show', 'aliases' ]
+try:
+    result = subprocess.check_output( cmd )
+except subprocess.CalledProcessError as err:
+    crier.critical(
+        'CRITICAL: squeue command failed with %s %s',
+        err.errno,
+        err.strerror
+    )
+    sys.exit(1)
+
+nodenames = ','.join(result.split())
+
+cmd = [ 'squeue', '-a', '-h', '-w', nodenames, '-o', '%u']
 try:
     result = subprocess.check_output( cmd )
 except subprocess.CalledProcessError as err:
