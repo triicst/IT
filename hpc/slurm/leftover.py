@@ -61,7 +61,6 @@ result = subprocess.check_output( cmd )
 running_users = set(result.rstrip('\n').split('\n'))
 
 invalid_users = running_users.difference( valid_users )
-invalid_users.add('petersen')
 
 if len( invalid_users ) == 0:
     crier.debug('DEBUG: leftover found no users with invalid jobs,' +
