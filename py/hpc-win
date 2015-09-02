@@ -1,0 +1,67 @@
+#! /usr/bin/env python
+
+# this script lists a number of VMs that have a certain name and 
+# are not started and lets the user select a VM to start 
+# dirkpetersen / 2015
+
+import getpass, sys
+from proxmoxer import ProxmoxAPI
+
+PROXHOST='proxmox.fhcrc.org'
+curruser=getpass.getuser()
+#pwd=getpass.getpass('Please enter the root password for %s: ' % PROXHOST)
+pwd='EEJYb5zxy8462ffyyyc96sXnNSF9DBhv'
+
+
+proxmox = ProxmoxAPI(PROXHOST, user='hpcdemo3@DOMAIN.ORG', password=pwd, verify_ssl=False)
+
+print('\nThe following Windows based HPC systems are available:\n')
+
+lastavail=''
+vmdir={}
+vmvals=[]
+vmcnt=0
+
+for node in proxmox.nodes.get():
+    for vm in proxmox.nodes(node['node']).qemu.get():
+        vmvals=[]
+        if vm['name'].startswith('hpc-win'):
+            vmcnt1 = '   '
+            if vm['status'] == 'stopped':
+                vmcnt+=1
+                vmvals.append(vm['vmid'])
+                vmvals.append(vm['name'])
+                vmvals.append(node['node'])
+                vmvals.append(vm['status'])
+                vmdir[vmcnt]=vmvals
+                vmcnt1 = "(%s)" % vmcnt
+            print "{0} {1}  ({2} cpu cores - {3} GB memory)  ==> {4}" .format(vmcnt1, 
+                    vm['name'], vm['cpus'], int(vm['maxmem'])/1024/1024/1024, vm['status'])
+
+if vmcnt==0:
+    print('\nThere are no idle virtual hpc systems available. \n' + 
+          'You may attempt to re-use one of the VMs that are already running.\n' +  
+          'Please make sure that you are not interrupting someone else.\n')
+else:
+    if vmcnt == 1:
+        inp = raw_input("\nDo you want to start VM %s now?\nEnter (y) or (n):"  % vmdir[vmcnt][1])
+        if inp=='y':
+            inp=1
+        else:
+            sys.exit()
+    else:
+        inp = raw_input("\nDo you want to start a VM now?\nEnter a number (1)-(%s) or (0)=exit:"  % vmcnt)
+
+    if int(inp)>vmcnt:
+        print("selection not valid, you need to enter a number between (1) and (%s)" % vmcnt)
+    else:
+        inp=int(inp)
+        if inp == 0: sys.exit()
+        ret=proxmox.nodes(vmdir[inp][2]).qemu(vmdir[inp][0]).status.start.post()
+        if ":qmstart:" in ret:
+            print("\nVM started ! Please enter one of these commands on your desktop:\n")
+            print("Windows: mstsc /f /v %s" % vmdir[inp][1])
+            print("Linux/Mac: rdesktop -u %s -d FHCRC -g 1024x700 %s" % (curruser, vmdir[inp][1]))
+        else:
+            print("VM not started ! Debug information: %s" % ret)
+
