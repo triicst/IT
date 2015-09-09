@@ -46,7 +46,7 @@ if [[ $fstype == "nfs" ]]; then
 fi
 
 if [ -d $MODULESHOME ]; then
-  module load python2 > /dev/null 2>&1
+  module load python3 > /dev/null 2>&1
 fi
 
 if ! hash swift 2>/dev/null; then
@@ -116,11 +116,77 @@ elif [[ -d /loc ]]; then
   mkdir -p /loc/.s3ql
 fi
 
-echo "...running mount.s3ql --authfile ~/.s3ql/$authinf $allow_other $compress $cachedir --metadata-upload-interval 21600 $s3qlurl /mnt/tin/$shortaccount/$container"
-mount.s3ql --authfile ~/.s3ql/$authinf $allow_other $compress $cachedir --metadata-upload-interval 21600 $s3qlurl /mnt/tin/$shortaccount/$container
-
-echo -e "\nto unmount use this command:"
-echo "umount.s3ql /mnt/tin/$shortaccount/$container"
 
 
+#######################################
+authfile=~/.s3ql/$authinf
+iface=`ip link | grep "state UP" | awk '{print $2}' | head -1` # get active interface 
+iface=${iface%?} #remove last char 
+
+read -d '' s3qlinit <<- EOF
+description	"S3QL Backup File System"
+author		"Nikolaus Rath <Nikolaus@rath.org>"
+
+start on (filesystem and net-device-up IFACE=${iface})
+
+# We cannot use "stop on runlevel [016]" because from that point on we
+# have only 10 seconds until the system shuts down completely.
+stop on starting rc RUNLEVEL=[016]
+
+# Time to wait before sending SIGKILL to the daemon and
+# pre-stop script
+kill timeout 300
+
+env STORAGE_URL="${s3qlurl}"
+env MOUNTPOINT="/mnt/tin/${shortaccount}/${container}"
+
+env USER="${user}"
+env AUTHFILE="${authfile}"
+
+expect stop
+
+script
+    # Redirect stdout and stderr into the system log
+    DIR=\$(mktemp -d)
+    mkfifo "\$DIR/LOG_FIFO"
+    logger -t s3ql -p local0.info < "\$DIR/LOG_FIFO" &
+    exec > "\$DIR/LOG_FIFO"
+    exec 2>&1
+    rm -rf "\$DIR"
+
+    # Check and mount file system
+    su -s /bin/sh -c 'exec "\$0" "\$@"' "\$USER" -- fsck.s3ql --batch --authfile "\$AUTHFILE" "\$STORAGE_URL"
+    exec su -s /bin/sh -c 'exec "\$0" "\$@"' "\$USER" -- mount.s3ql --upstart --authfile "\$AUTHFILE" $allow_other $compress $cachedir --metadata-upload-interval 21600 "\$STORAGE_URL" "\$MOUNTPOINT"
+end script
+
+pre-stop script
+    su -s /bin/sh -c 'exec "\$0" "\$@"' "\$USER" -- umount.s3ql "\$MOUNTPOINT"
+end script
+EOF
+
+doupstart=1
+if [[ "$user" == "root" ]]; then
+  read -r -p "Do you want to activate upstart /etc/init/s3ql_${shortaccount}_${container}.conf ? [Y/N] " response
+  case "$response" in
+    [yY][eE][sS]|[yY])
+      echo "$s3qlinit" > "/etc/init/s3ql_${shortaccount}_${container}.conf"
+      echo "created /etc/init/s3ql_${shortaccount}_${container}.conf"
+      service "s3ql_${shortaccount}_${container}" start
+      echo "to stop s3ql execute: service s3ql_${shortaccount}_${container} stop"
+      ;;
+    *)
+      doupstart=0
+  esac
+else
+  doupstart=0
+fi
+if [[ doupstart -eq 0 ]]; then
+  echo "$s3qlinit" > "/tmp/s3ql_${shortaccount}_${container}.conf"
+  echo "created upstart config /tmp/s3ql_${shortaccount}_${container}.conf for later use"
+  echo "...running mount.s3ql --authfile ~/.s3ql/$authinf $allow_other $compress $cachedir --metadata-upload-interval 21600 $s3qlurl /mnt/tin/$shortaccount/$container"
+  mount.s3ql --authfile ~/.s3ql/$authinf $allow_other $compress $cachedir --metadata-upload-interval 21600 $s3qlurl /mnt/tin/$shortaccount/$container
+  echo -e "\nto unmount use this command:"
+  echo "umount.s3ql /mnt/tin/$shortaccount/$container"
+fi
+echo "*** IMPORTANT ***: please ask the storage team to set header X-Undelete-Enabled:no for container $swiftaccount/$container to optimze performance and stability" 
 
