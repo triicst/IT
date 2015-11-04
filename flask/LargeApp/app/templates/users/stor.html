@@ -1,0 +1,181 @@
+{% extends "layout.html" %}
+{% block content %}
+
+    <div class="row">
+        <div class="span12">
+            <p class="center_content"><strong><span class="label label-info" style="font-size: 20px; margin: 8px; padding: 7px;">Instructions</span><span style="font-size: 20px; padding: 7px;">Enter your approximate storage requirements, all fields are required.</strong</span>
+            </p>
+            <p>
+                <div class="offset3 span7 alert alert-info">
+                    Center IT cannot guarantee future storage cost decreases, a 15% default 
+                    is an educated guess at best.  Set annual cost decline to 0% for a more conservative estimate.
+                </div>
+                <div class="span2">
+                </div>
+            </p>
+        </div>
+    </div>
+    <div class="row">
+        <div class="span5">
+            <div class="pull-right">
+                <form id="storage_form" class="form-horizontal">
+                  <div class="control-group">
+                    <label class="control-label" for="secure_gb"><strong>High Security</strong></label>
+                    <div class="controls input-append">
+                      <input name="secure_gb" type="number" required="required" value="0" min="0" max="100000" id="secure_gb">
+                      <span class="add-on">GB</span>
+                    </div>
+                  </div>
+                  <div class="control-group">
+                    <label class="control-label" for="fast_file_tb"><strong>Fast File</strong></label>
+                    <div class="controls input-append">
+                      <input name="fast_file_tb" type="number" required="required" value="0"  min="0" max="1000" id="fast_file_tb">
+                      <span class="add-on">TB</span>
+                    </div>
+                  </div>
+                  <div class="control-group">
+                    <label class="control-label" for="economy_tb"><strong>Economy File</strong></label>
+                    <div class="controls input-append">
+                      <input name="economy_tb" type="number" required="required" value="0"  min="0" max="1000" id="economy_tb">
+                      <span class="add-on">TB</span>
+                      <p />
+                    </div>
+                  </div>
+                  <div class="control-group">
+                    <label class="control-label" for="growth_rate"><strong>Annual Growth Rate</strong></label>
+                    <div class="controls input-append">
+                      <input name="growth_rate" type="number" required="required" id="growth_rate" min="0" max="1000" value="30">
+                      <span class="add-on">%</span>
+                    </div>
+                  </div>
+                  <div class="control-group">
+                    <label class="control-label" for="cost_decline"><strong>Annual Cost Decline</strong></label>
+                    <div class="controls input-append">
+                      <input name="cost_decline" type="number" required="required" id="cost_decline" value="15" min="0" max="100">
+                      <span class="add-on">%</span>
+                    </div>
+                  </div>
+                  <div class="control-group">
+                    <div class="controls">
+                      <button type="submit" class="btn btn-large btn-primary">Calculate Cost</button>
+                    </div>
+                  </div>
+                </form>
+            </div>
+        </div>
+        <div class="span7">
+            <div id="ajax_error" class="alert alert-error hide">
+                An error occurred while attempting to calculate projected costs.  Please review your input values and try again.
+            </div>
+            <table id="cost_grid" class="table table-hover table-striped hide">
+              <thead>
+                <tr>
+                  <th>Year</th>
+                  <th>Usage</th>
+                  <th>High Security</th>
+                  <th>Fast</th>
+                  <th>Economy</th>
+                  <th>Monthly</th>
+                  <th>Annual</th>
+                  <th>Cumulative</th>
+                </tr>
+              </thead>
+              <tbody>
+              </tbody>
+            </table>
+            <div class="spin_box">
+                <div id="spin" class="spin"></div>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="span6">
+        </div>
+        <div class="span6">
+        </div>
+    </div>
+
+
+<script>
+$(document).ready(function() {
+
+    // Startup spinner
+    var opts = {
+          lines: 11, // The number of lines to draw
+          length: 17, // The length of each line
+          width: 7, // The line thickness
+          radius: 10, // The radius of the inner circle
+          corners: 1, // Corner roundness (0..1)
+          rotate: 0, // The rotation offset
+          color: '#000', // #rgb or #rrggbb
+          speed: 0.9, // Rounds per second
+          trail: 81, // Afterglow percentage
+          shadow: false, // Whether to render a shadow
+          hwaccel: false, // Whether to use hardware acceleration
+          className: 'spin', // The CSS class to assign to the spinner
+          top: 'auto', // Top position relative to parent in px
+          left: 'auto' // Left position relative to parent in px
+    };
+    var spinner = new Spinner(opts).spin();
+
+    // Ajax form posting
+    $('#storage_form').submit(function () {
+            var data = new Object();
+            $("#storage_form :input").each(function() {
+                data[$(this).attr("name")] = $(this).val();
+            });
+            $('#cost_grid').addClass('invisible');
+            $('#cost_grid').hide();
+            $("#spin").append(spinner.el);
+            $("#spin").show();
+            $.ajax({
+                url: 'api/calculate/json',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(data),
+                dataType: 'json',
+                success: function (result) {
+                    var items = [];
+                    $('table#cost_grid tbody').empty();
+                    var cost_period_row = '<tr><td colspan="1" class="">' + " " + '</td>' + 
+                        '<td id="monthly" colspan="1" class="text-warning monthly-left monthly-right">' + " " + '</td>' + 
+                        '<td id="monthly" colspan="3" class="text-warning monthly-left monthly-right">' + "Monthly Breakdown" + '</td>' + 
+                        '<td id="total" colspan="3" class="text-error">' + "Total Costs" + '</td></tr>';
+                    $('table#cost_grid tbody:last').append(cost_period_row);
+                    $.each(result, function(key, values) {
+                        var cost_row = '<tr><td>' + key + '</td>' + 
+                            '<td class="monthly-left monthly-right">' + values['total_usage'] + 'TB</td>' +
+                            '<td class="monthly-left">$' + values['hss_month'] + '</td>' +
+                            '<td>$' + values['ffs_month'] + '</td>' + 
+                            '<td class="monthly-right">$' + values['es_month'] + '</td>' + 
+                            '<td>$' + values['monthly_total'] + '</td>' + 
+                            '<td>$' + values['annual_total'] + '</td>' + 
+                            '<td>$' + values['cumulative_total'] + '</td>' + 
+                            '</tr>';
+                        $('table#cost_grid tbody:last').append(cost_row);
+                    });
+                    $('#ajax_error').hide();
+                    $("#spin").hide();
+                    $('#cost_grid').removeClass('invisible');
+                    $('#cost_grid').show(600);
+                },
+                error: function (result) {
+                    $("#spin").hide();
+                    $('#cost_grid').hide(600);
+                    $('#ajax_error').show();
+                }
+            });
+
+            return false;
+        });
+
+
+});
+</script>
+
+
+
+
+
+
+{% endblock %}
