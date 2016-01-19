@@ -189,10 +189,11 @@ def setup():
             testdate = easygui.enterbox(msg, __app__,testdate)
             if not testdate:
                 break
-            if testdate != '':                
+            if testdate != '':
+                exe=getMyFile()
                 try:
                     out=subprocess.check_output(
-                        '%s --debug --search-date %s %s' % (getMyFile(),testdate,config),
+                        '%s --debug --search-date %s %s' % (exe,testdate,config),
                         stderr=subprocess.STDOUT,
                         shell=True)
                 except :
