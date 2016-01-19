@@ -499,12 +499,20 @@ def send_mail(to, subject, text, attachments=[], cc=[], bcc=[], smtphost="", fro
     myhost=socket.getfqdn()
 
     if smtphost == '':
-        smtphost = get_mx_from_email_or_fqdn(myhost)
+        if sys.platform == 'win32':
+            smtphost = 'mx'
+        else:
+            smtphost = get_mx_from_email_or_fqdn(myhost)
     if not smtphost:
         sys.stderr.write('could not determine smtp mail host !\n')
+
+    try:
+        base = os.path.basename(__file__)
+    except NameError:  # We are the main py2exe script, not a module
+        base = os.path.basename(sys.argv[0])
         
     if fromaddr == '':
-        fromaddr = os.path.basename(__file__) + '-no-reply@' + \
+        fromaddr = base + '-no-reply@' + \
            '.'.join(myhost.split(".")[-2:]) #extract domain from host
     tc=0
     for t in to:
