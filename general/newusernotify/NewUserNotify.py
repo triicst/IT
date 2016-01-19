@@ -454,9 +454,11 @@ def ldapinit():
     try:
         l = ldap.initialize( ADServer )
         l.set_option(ldap.OPT_REFERRALS, 0)
-        #l.simple_bind_s( args.binddn, args.bindpw )
-        auth = ldap.sasl.gssapi("")
-        l.sasl_interactive_bind_s("", auth)
+        if sys.platform == 'win32':
+            l.simple_bind_s( args.binddn, args.bindpw )
+        else:
+            auth = ldap.sasl.gssapi("")
+            l.sasl_interactive_bind_s("", auth)
         return l
     except ldap.LOCAL_ERROR, err:
         errstr = err[0]['info']
