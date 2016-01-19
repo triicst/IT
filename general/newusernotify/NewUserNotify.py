@@ -178,6 +178,33 @@ def setup():
     
     cfg.store()    # persist the settings
 
+    testdate=''
+    cmdline=''
+    while True:
+        if easygui.boolbox('Do you want to test this configuration (again) ?', __app__, ('Yes', 'No')):
+            msg = ("If you want to test this config, please enter the creation date "
+                         "(format: YYYYMMDD) you would like to test."
+                        )
+            testdate = easygui.enterbox(msg, __app__,testdate)
+            if not testdate:
+                break
+            if testdate != '':
+                cmdline = '%s --debug --search-date %s %s' % (getMyFile(),testdate,config)
+                try:
+                    out=subprocess.check_output(
+                        cmdline,
+                        stderr=subprocess.STDOUT,
+                        shell=True)
+                except subprocess.CalledProcessError, e:
+                    print "subproces CalledProcessError.output = " + e.output
+                easygui.codebox('Please see debugging output below:', __app__, out)
+        else:
+            break
+    if cmdline != '':
+        cmdline = '%s %s' % (getMyFile(),config)
+        easygui.codebox('Please activate this command via cron:' , __app__,cmdline)
+            
+
 class Settings(easygui.EgStore):
     def __init__(self, filename):  # filename is required
         #-------------------------------------------------
@@ -442,6 +469,14 @@ def sidstr2gid(sidstr):
     m = re.search(r'\d+$', sidstr)
     return int(m.group())+100000
 
+def getMyFile():
+    try:
+        myFile = os.path.abspath( __file__ )
+    except:
+        #if hasattr(sys,"frozen") and sys.frozen == "windows_exe": ... does not work
+        myFile = os.path.abspath(sys.executable)
+    return myFile
+
 def uniq(seq):
    # Not order preserving
    keys = {}
@@ -535,7 +570,7 @@ def send_mail(to, subject, text, attachments=[], cc=[], bcc=[], smtphost="", fro
             'information in your logs.\n'
             )
     host_name = socket.gethostname()
-    full_body = body.substitute(host=host_name.upper(), notify_text=text, application=os.path.basename(__file__))
+    full_body = body.substitute(host=host_name.upper(), notify_text=text, application=base)
 
     if text.startswith('<html>') or text.startswith('<table>'):
         full_body=full_body.replace('\n','<br>')
