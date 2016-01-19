@@ -178,8 +178,10 @@ def setup():
     
     cfg.store()    # persist the settings
 
-    testdate=''
+    
     cmdline=''
+    testdate=''
+    out=''
     while True:
         if easygui.boolbox('Do you want to test this configuration (again) ?', __app__, ('Yes', 'No')):
             msg = ("If you want to test this config, please enter the creation date "
@@ -204,7 +206,6 @@ def setup():
         cmdline = '%s %s' % (getMyFile(),config)
         easygui.codebox('Please activate this command via cron:' , __app__,cmdline)
             
-
 class Settings(easygui.EgStore):
     def __init__(self, filename):  # filename is required
         #-------------------------------------------------
