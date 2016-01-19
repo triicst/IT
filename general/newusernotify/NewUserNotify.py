@@ -193,7 +193,7 @@ def setup():
                 exe=getMyFile()
                 try:
                     out=subprocess.check_output(
-                        '%s --debug --search-date %s %s' % (exe,testdate,config),
+                        '"%s" --debug --search-date %s %s' % (exe,testdate,config),
                         stderr=subprocess.STDOUT,
                         shell=True)
                 except :
