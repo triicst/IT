@@ -179,7 +179,6 @@ def setup():
     cfg.store()    # persist the settings
 
     
-    cmdline=''
     testdate=''
     out=''
     while True:
@@ -190,21 +189,20 @@ def setup():
             testdate = easygui.enterbox(msg, __app__,testdate)
             if not testdate:
                 break
-            if testdate != '':
-                cmdline = '%s --debug --search-date %s %s' % (getMyFile(),testdate,config)
+            if testdate != '':                
                 try:
                     out=subprocess.check_output(
-                        cmdline,
+                        '%s --debug --search-date %s %s' % (getMyFile(),testdate,config),
                         stderr=subprocess.STDOUT,
                         shell=True)
-                except subprocess.CalledProcessError, e:
-                    print "subproces CalledProcessError.output = " + e.output
+                except :
+                    print "likely subproces CalledProcessError.output "
                 easygui.codebox('Please see debugging output below:', __app__, out)
         else:
             break
-    if cmdline != '':
-        cmdline = '%s %s' % (getMyFile(),config)
-        easygui.codebox('Please activate this command via cron:' , __app__,cmdline)
+
+    cmdline = '%s %s' % (getMyFile(),config)
+    easygui.codebox('Please activate this command via cron:' , __app__,cmdline)
             
 class Settings(easygui.EgStore):
     def __init__(self, filename):  # filename is required
