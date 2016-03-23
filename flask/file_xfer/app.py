@@ -3,6 +3,7 @@
 # Two stage upload - form then upload pages
 # Attempt to add WTF Flask functionality
 # Basic flask upload handler from blueimp jQuery File Upload
+# formerly jmk fapp2.py
 
 import os,re,urllib.parse
 
@@ -14,6 +15,9 @@ from flask_wtf import Form
 from wtforms import StringField
 from wtforms import Form, BooleanField, TextField, PasswordField, validators
 from wtforms.validators import DataRequired
+
+# used to launch upload as Slurm batch job
+import subprocess
 
 app = Flask(__name__)
 app.secret_key = 'A0Zr98j/3ybR~XHH!jmN]LWX/,?RT'
@@ -59,12 +63,15 @@ def upload_file():
        if int(range[2])+1<int(range[3]):
           last=False
 
-    save_upload(recvd,mode,
-       os.path.join("frobozz",secure_filename(recvd.filename)))
+    dest=os.path.join("frobozz",secure_filename(recvd.filename))
+    save_upload(recvd,mode,dest)
 
     if last==True:
        params=urllib.parse.parse_qs(request.form['data'])
        print("params",params)
+
+       if dest.endswith(".sbatch"):
+           result=subprocess.call(["sbatch",dest])
   
     return make_response(200,{"success":True})
 
