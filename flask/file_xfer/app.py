@@ -22,6 +22,9 @@ import subprocess
 app = Flask(__name__)
 app.secret_key = 'A0Zr98j/3ybR~XHH!jmN]LWX/,?RT'
 
+# specify upload directory
+upload_dir="frobozz"
+
 class UploadForm(Form):
     name = TextField('Username', [validators.Length(min=4, max=25)])
     email = TextField('Email Address', [validators.Length(min=6, max=35)])
@@ -52,6 +55,8 @@ def root_page():
 
 @app.route('/uploadfile',methods=['POST'])
 def upload_file():
+    global upload_dir
+
     recvd=request.files['files[]']
     last=True
     mode="wb"
@@ -63,7 +68,7 @@ def upload_file():
        if int(range[2])+1<int(range[3]):
           last=False
 
-    dest=os.path.join("frobozz",secure_filename(recvd.filename))
+    dest=os.path.join(upload_dir,secure_filename(recvd.filename))
     save_upload(recvd,mode,dest)
 
     if last==True:
@@ -71,7 +76,7 @@ def upload_file():
        print("params",params)
 
        if dest.endswith(".sbatch"):
-           result=subprocess.call(["sbatch",dest])
+           result=subprocess.call(["sbatch","-p","restart",dest])
   
     return make_response(200,{"success":True})
 
