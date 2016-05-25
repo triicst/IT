@@ -46,7 +46,7 @@ def main():
         for uid in uids_add:
             print('%s: %s' % (n,uid))
             # ignore some jobtitles 
-            if jsearchone(j,"uid",uid,"mail") == "" or jsearchone(j,"uid",uid,"title") in titignore:
+            if jsearchone(j,"employeeID",uid,"mail") == "" or jsearchone(j,"employeeID",uid,"title") in titignore:
                 continue
 
             with open(os.path.join(args.dir,str(uid)), 'w') as outfile:
