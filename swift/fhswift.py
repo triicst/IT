@@ -8,7 +8,7 @@ the swift object store at Fred Hutch.
 to test, run this in a python shell:
 
 import fhswift
-tests()
+fhswift.tests()
 
 """
 
