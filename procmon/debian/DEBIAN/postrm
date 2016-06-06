@@ -1,0 +1,18 @@
+#!/bin/bash
+
+#  procmon postrm
+#
+#  2016.02.05 john dey
+#
+
+#  remove init.d links "post" remove
+#  update-rc.d removes any links in the /etc/rcrunlevel.d directories to  
+#  the  script  /etc/init.d/name. The script must have been deleted already. 
+set -e
+if [ "$1" = "remove" -o "$1" = "purge" ]; then
+    if [ ! -e /etc/init.d/procmon -a -e /etc/rc3.d/S*procmon ]; then
+        update-rc.d procmon remove 
+    fi
+fi
+
+exit 0

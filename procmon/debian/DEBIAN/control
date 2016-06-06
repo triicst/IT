@@ -1,0 +1,10 @@
+Package: procmon
+Architecture: amd64
+Section: utils 
+Priority: optional 
+Version: 1.1.0-1
+Homepage: "https://github.com/fizwit/procmon.git"
+Depends: rsyslog (>=7.0.0), coreutils (>=8.20), libc-bin (>=2.19), libc6 (>= 2.19)
+Maintainer: John Dey <jfdey@fredhutch.org>
+Description: PROCess MONitor, Use Linux proc_mon connector to log process creation (exec). procmon writes output to /var/log/procmon via rsyslog
+Package-Type: deb

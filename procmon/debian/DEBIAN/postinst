@@ -1,0 +1,24 @@
+#!/bin/bash
+
+#  procmon postint 
+#
+#  2016.02.05 john dey
+#
+set -e
+
+if [ "$EUID" -ne 0 ]; then
+  echo "Please run as root"
+  exit
+fi
+
+if [ "$1" = "configure" ]; then
+    service rsyslog restart
+    if [ ! -e /etc/rc3.d/S*procmon ]; then
+        update-rc.d procmon defaults
+    fi
+    if [ ! -e /var/run/procmon.pid ]; then
+        service procmon start
+    fi
+fi
+
+exit 0

@@ -1,0 +1,25 @@
+procmon (1.1.0-1) UNRELEASED; urgency=medium
+
+  * host field name changed to 'node'. host is reserved word in Splunk 
+
+ -- John Dey <jfdey@rhino-d.fhcrc.org>  Fri, 06 May 2016 14:57:21 -0700
+
+procmon (1.0.3-1ubuntu1) experimental; urgency=medium
+
+  * correct grammer of manual page 
+
+ -- John Dey <jfdey@rhino-d.fhcrc.org>  Wed, 04 May 2016 15:06:04 -0700
+
+procmon (1.0.2-1) experimental; urgency=low
+
+  * move binary to /usr/bin
+  * move man page to /usr/share/man/man8
+  * logrotate changed to purge every seven days
+
+ -- John Dey <jfdey@rhino-d.fhcrc.org>  Wed, 04 May 2016 15:05:19 -0700
+
+procmon (1.0-1) experimental; urgency=low
+
+  * Initial release
+
+ -- John Dey <jfdey@fredhutch.org>  Mon, 07 Mar 2016 13:03:58 -0800

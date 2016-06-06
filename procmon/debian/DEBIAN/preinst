@@ -1,0 +1,14 @@
+#!/bin/sh
+
+#  preinst 
+#
+#  2016.02.05 john dey
+#
+set -e
+if [ "$1" = "install" ]; then
+    if [ -e /var/run/procmon.pid ]; then
+        service procmon stop
+    fi
+fi
+
+exit 0
