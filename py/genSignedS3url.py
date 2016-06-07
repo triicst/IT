@@ -13,7 +13,7 @@ def genURL(bucketname, filename, days):
 
 if __name__ == "__main__":
     if len(sys.argv) < 4:
-        print("\nUSAGE: {0} bucketname file linkLifeInDays\n".format(sys.argv[0]))
+        print("\nUSAGE: {0} bucketname filename linkLifeInDays\n".format(sys.argv[0]))
         sys.exit(1)
     bucketname = sys.argv[1]
     filename = sys.argv[2]
