@@ -81,7 +81,17 @@ Set-Location -Path O:\scripts\aws
 
 ###2. Building the MongoDB cluster
 
-After your EC2 nodes are up and running, SCP "create-mongodb-cluster.sh" to the first node (mongo-db1 in this example), then SSH to it (mongo-db1) and run the following commands:
+After your EC2 nodes are up and running, edit the "create-mongodb-cluster.sh" to set the hostname and password variables to the desired values:
+
+```bash
+# Variables 
+db1=mongo-db1
+db2=mongo-db2
+db3=mongo-db3
+password=mypassword
+```
+
+After editing the varibles in "create-mongodb-cluster.sh", save it and SCP it to the first node (mongo-db1 in this example). Next SSH to it (mongo-db1) and run the following commands:
 
 ```bash
 chmod 755 create-mongodb-cluster.sh
