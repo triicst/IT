@@ -198,7 +198,7 @@ docker run --name mongodb \
 -v /data/keys:/opt/keyfile \
 -v /data/setup:/setup \
 --hostname="${db1}" \
--p 27017:27017 -p 27018:27018 -p 27019:27019 -p 28017:28017 \
+-p 27017:27017 -p 27018:27018 -p 27019:27019 \
 -d mongo:3.2.7 --smallfiles
 
 # Create mongo users on DB1 
@@ -215,7 +215,7 @@ docker run --name mongodb \
 -v /data/setup:/setup \
 --restart always \
 --hostname="${db1}" \
--p 27017:27017 -p 27018:27018 -p 27019:27019 -p 28017:28017 \
+-p 27017:27017 -p 27018:27018 -p 27019:27019 \
 -d mongo:3.2.7 --auth --smallfiles \
 --keyFile /opt/keyfile/mongodb-keyfile \
 --replSet "rs0"
@@ -231,7 +231,7 @@ ssh root@${db2} docker run --name mongodb \
 -v /data/setup:/setup \
 --restart always \
 --hostname="${db2}" \
--p 27017:27017 -p 27018:27018 -p 27019:27019 -p 28017:28017 \
+-p 27017:27017 -p 27018:27018 -p 27019:27019 \
 -d mongo:3.2.7 --auth --smallfiles \
 --keyFile /opt/keyfile/mongodb-keyfile \
 --replSet "rs0"
@@ -243,7 +243,7 @@ ssh root@${db3} docker run --name mongodb \
 -v /data/setup:/setup \
 --restart always \
 --hostname="${db3}" \
--p 27017:27017 -p 27018:27018 -p 27019:27019 -p 28017 \
+-p 27017:27017 -p 27018:27018 -p 27019:27019 \
 -d mongo:3.2.7 --auth --smallfiles \
 --keyFile /opt/keyfile/mongodb-keyfile \
 --replSet "rs0"
