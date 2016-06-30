@@ -88,10 +88,23 @@ After your EC2 nodes are up and running, edit the "create-mongodb-cluster.sh" to
 db1=mongo-db1
 db2=mongo-db2
 db3=mongo-db3
-password=mypassword
+userAdminPasswd=P@ssword
+rootAdminPasswd=P@ssword
+oncoscapePasswd=P@ssword
+oncoscapeReadPasswd=P@ssword
 ```
 
-After editing the varibles in "create-mongodb-cluster.sh", save it and SCP it to the first node (mongo-db1 in this example). Next SSH to it (mongo-db1) and run the following commands:
+***Note:*** The above passwords map to the following mongo user accounts and roles: 
+
+| Mongo Users   | Password Variable     | Mongo Role           |
+|:--------      |:--------              |:--------             |
+| rootAdmin     | rootAdminPassword     | root                 |
+| userAdmin     | userAdminPassword     | userAdminAnyDatabase | 
+| oncoscape     | oncoscapePassword     | readWriteAnyDatabase |
+| oncoscapeRead | oncoscapeReadPassword | readAnyDatabase      |
+
+
+After editing the varibles in "create-mongodb-cluster.sh" script, SCP it to the first node (mongo-db1 in this example). Next, SSH to it (mongo-db1) and run the following commands:
 
 ```bash
 chmod 755 create-mongodb-cluster.sh
@@ -99,6 +112,8 @@ chmod 755 create-mongodb-cluster.sh
 sudo ./create-mongodb-cluster.sh
 ```
 
-The script should take about 5 minutes to complete. You should now have a three node replica cluster with mongo-db1 as the favored primary (read/write) with the secondaries mongo-db2, mongo-db3 serving a read replicas that can take over the primary node role until mongo-db1 returns to service.
+The script should take about 5 minutes to complete... 
+
+When complete, you should now have a three node replica cluster with mongo-db1 as the favored primary (read/write) with the secondaries mongo-db2, mongo-db3 serving a read replicas that can take over the primary node role until mongo-db1 returns to service.
 
   

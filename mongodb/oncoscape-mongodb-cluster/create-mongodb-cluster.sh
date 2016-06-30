@@ -1,10 +1,13 @@
 #!/bin/bash
 
 # Variables 
-db1=mongo-db1.fredhutch.center
-db2=mongo-db2.fredhutch.center
-db3=mongo-db3.fredhutch.center
-password=P@ssword
+db1=oncoscape-db1.sttrcancer.io
+db2=oncoscape-db2.sttrcancer.io
+db3=oncoscape-db3.sttrcancer.io
+userAdminPasswd=P@ssword
+rootAdminPasswd=P@ssword
+oncoscapePasswd=P@ssword
+oncoscapeReadPasswd=P@ssword
 
 # Generate an SSH key
 /usr/bin/ssh-keygen -f /root/.ssh/id_rsa -t rsa -N ''
@@ -126,20 +129,26 @@ conn = new Mongo("localhost:27017");
 db = conn.getDB("admin")
 
 db.createUser( {
-     user: "siteUserAdmin",
-     pwd: "${password}",
+     user: "userAdmin",
+     pwd: "${userAdminPasswd}",
      roles: [ { role: "userAdminAnyDatabase", db: "admin" } ]
    });
 
 db.createUser( {
-     user: "siteRootAdmin",
-     pwd: "${password}",
+     user: "rootAdmin",
+     pwd: "${rootAdminPasswd}",
      roles: [ { role: "root", db: "admin" } ]
    });
 
 db.createUser( {
      user: "oncoscape",
-     pwd: "${password}",
+     pwd: "${oncoscapePasswd}",
+     roles: [ { role: "readWriteAnyDatabase", db: "admin" } ]
+   });
+
+db.createUser( {
+     user: "oncoscapeRead",
+     pwd: "${oncoscapeReadPasswd}",
      roles: [ { role: "readWriteAnyDatabase", db: "admin" } ]
    });
 EOL
