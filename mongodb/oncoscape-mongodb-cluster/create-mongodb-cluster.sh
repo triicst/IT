@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Variables 
-db1=oncoscape-db1.sttrcancer.io
-db2=oncoscape-db2.sttrcancer.io
-db3=oncoscape-db3.sttrcancer.io
-userAdminPasswd=P@ssword
-rootAdminPasswd=P@ssword
-oncoscapePasswd=P@ssword
-oncoscapeReadPasswd=P@ssword
+db1=dev-db1
+db2=dev-db2
+db3=dev-db3
+userAdminPasswd=P@assword
+rootAdminPasswd=P@assword
+oncoscapePasswd=P@assword
+oncoscapeReadPasswd=P@assword
 
 # Generate an SSH key
 /usr/bin/ssh-keygen -f /root/.ssh/id_rsa -t rsa -N ''
@@ -149,7 +149,7 @@ db.createUser( {
 db.createUser( {
      user: "oncoscapeRead",
      pwd: "${oncoscapeReadPasswd}",
-     roles: [ { role: "readWriteAnyDatabase", db: "admin" } ]
+     roles: [ { role: "readAnyDatabase", db: "admin" } ]
    });
 EOL
 chown 999 /data/setup/createusers.js
@@ -159,7 +159,7 @@ chown 999 /data/setup/createusers.js
 cat > /data/setup/rs-init.js << EOL
 conn = new Mongo("localhost:27017");
 db = conn.getDB("admin");
-db.auth("siteRootAdmin", "${password}");
+db.auth("rootAdmin", "${rootAdminPasswd}");
 rs.initiate();
 EOL
 chown 999 /data/setup/rs-init.js
@@ -168,7 +168,7 @@ chown 999 /data/setup/rs-init.js
 cat > /data/setup/add-nodes.js  << EOL
 conn = new Mongo("localhost:27017");
 db = conn.getDB("admin");
-db.auth("siteRootAdmin", "${password}");
+db.auth("rootAdmin", "${rootAdminPasswd}");
 rs.add("${db2}");
 rs.add("${db3}");
 cfg = rs.conf()
@@ -183,7 +183,7 @@ chown 999 /data/setup/add-nodes.js
 cat > /data/setup/enable-reads-on-secondary.js << EOL
 conn = new Mongo("localhost:27017");
 db = conn.getDB("admin");
-db.auth("siteRootAdmin", "${password}");
+db.auth("rootAdmin", "${rootAdminPasswd}");
 rs.slaveOk();
 EOL
 chown 999 /data/setup/enable-reads-on-secondary.js
