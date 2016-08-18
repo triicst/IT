@@ -2,7 +2,7 @@
 
 ##Create the image 
 
-With the Dockerfile in your current direcotory:
+With the Dockerfile in your current directory:
 
 ```docker
 docker build -t fredhutch/powershell .
@@ -14,7 +14,7 @@ docker build -t fredhutch/powershell .
 docker run -ti --rm -v /home/rmcdermo:/home fredhutch/powershell
 ```
 
-The above will create a new container from the image you created and drop you at the PowerShell command prompt. The path '/home/rmcdermo' on the docker host will be mounted in the conatiner at '/home'.
+The above will create a new container from the image you created in the step above and drop you at the PowerShell command prompt. The path '/home/rmcdermo' on the docker host will be mounted in the conatiner at '/home'.
 
 ```
 Copyright (C) 2016 Microsoft Corporation. All rights reserved.
@@ -24,7 +24,7 @@ PS />
 
 ##Start using PowerShell
 
-In the following example I want to find the top ten files in my home directory (mounted at /home in the conatiner) that where access less than seven days ago, sorted decending by size.
+In the following example I want to find the top ten files in my home directory (mounted at /home in the conatiner) that where accessed less than seven days ago, sorted decending by size.
 
 ```powershell
 PS /> Get-ChildItem -path /home -Recurse | Where-Object {$_.PSIsContainer -eq $false -and ($_.LastAccessTime -gt (get-date).AddDays(-7))}| Select-Object -Property Name, Length, LastAccessTime| Sort-Object -Property length -Descending| Select-Object -First 10                                                               
@@ -47,3 +47,4 @@ Professional SharePoint 2013 Administration.pdf  58589066 08/17/2016 22:59:33
 Head First JavaScript -ebooksfeed.com.pdf        53643303 08/17/2016 22:59:02
 ```
 
+Enjoy!
