@@ -2,6 +2,8 @@
 
 ##Create the image 
 
+With the Dockerfile in your current direcotory:
+
 ```docker
 docker build -t fredhutch/powershell .
 ```
