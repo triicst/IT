@@ -24,7 +24,7 @@ PS />
 
 ##Start using PowerShell
 
-In the following example I want to find the top ten files in my home directory (mounted at /home in the conatiner) that where accessed less than seven days ago, sorted decending by size.
+In the following example I want to find the top ten files in my home directory (mounted at /home in the container) that where accessed less than seven days ago, sorted decending by size.
 
 ```powershell
 PS /> Get-ChildItem -path /home -Recurse | Where-Object {$_.PSIsContainer -eq $false -and ($_.LastAccessTime -gt (get-date).AddDays(-7))}| Select-Object -Property Name, Length, LastAccessTime| Sort-Object -Property length -Descending| Select-Object -First 10                                                               
