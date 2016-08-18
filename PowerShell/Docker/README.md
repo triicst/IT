@@ -1,4 +1,4 @@
-# Running PowerShell on Linux via docker
+# Running PowerShell on Linux via Docker
 
 ##Create the image 
 
