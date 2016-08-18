@@ -44,7 +44,7 @@ HeLa_EGF_5min_diQC_080816_01.raw                643219232 08/16/2016 23:23:39
 HeLa_EGF_10min_diQC_080816_01.raw               634456552 08/16/2016 23:23:21
 Programming Computer Vision with Python.pdf      72874552 08/17/2016 22:59:34
 Professional SharePoint 2013 Administration.pdf  58589066 08/17/2016 22:59:33
-Head First JavaScript -ebooksfeed.com.pdf        53643303 08/17/2016 22:59:02
+Head-First-JavaScript.pdf                        53643303 08/17/2016 22:59:02
 ```
 
 Enjoy!
