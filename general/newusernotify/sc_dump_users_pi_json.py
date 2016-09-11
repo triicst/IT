@@ -138,7 +138,7 @@ conn.close()
 
 j = json.dumps(objects_list, indent=4)
 
-with open(outfolder + '/sc_pi_all.json', 'w') as f:
+with open(outfolder + '/pi_all.json', 'w') as f:
         f.write(j)
 
 sys.exit()

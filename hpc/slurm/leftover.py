@@ -44,7 +44,7 @@ def snapshot_process_table(crier):
            crier.info("no uid for %s", psi[0])
            pw_uid = -1
 
-        if pw_uid < 10000:
+        if pw_uid < 5000:
            protected_users.add(psi[0])
            continue
 
@@ -85,7 +85,7 @@ def kill_user_procs(procs,crier):
      try:
         subprocess.check_call(['kill','-9',proc])
      except subprocess.CalledProcessError as err:
-        print("kill",proc,"returns",err)
+        crier.info("leftover: kill %s returns error %s" % (proc, err))
 
 def main(args):
   crier=init_logging()
@@ -95,7 +95,8 @@ def main(args):
 
   for users,procs in proc_tbl.items():
      if users not in slurm_users:
-        kill_user_procs(procs,crier)     
+        crier.info('leftover: killing all processes run by %s' % users)
+        kill_user_procs(procs,crier)
 
 if __name__ == '__main__':
    main(sys.argv[1:])
