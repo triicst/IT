@@ -1,98 +1,101 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import subprocess
-import socket
 import sys
+import pwd
+
 import logging
 import logging.handlers
-from time import sleep
 
-crier = logging.getLogger('crybaby')
-crier.setLevel( logging.DEBUG )
-syslog = logging.handlers.SysLogHandler(
-    address = '/dev/log',
-    facility='daemon'
-)
-crier.addHandler( syslog )
-
-crier.info( 'leftover starting' )
-crier.debug( 'DEBUG: leftover syslog logging setup complete' )
-
-protected_users = (
-    'avahi', 'daemon', 'ganglia', 'haldaemon',
-    'halevt', 'lp', 'messagebus', 'munge', 'nobody',
-    'ntp', 'postfix', 'root', 'statd', 'syslog',
-    'www-data', 'landscape', 'sshd', 'man', 'klog',
-)
-
-# find all the nodes configured on this host when
-# multiple slurmd's are running
-
-cmd = [ 'scontrol', 'show', 'aliases' ]
-try:
-    result = subprocess.check_output( cmd )
-except subprocess.CalledProcessError as err:
-    crier.critical(
-        'CRITICAL: squeue command failed with %s %s',
-        err.errno,
-        err.strerror
-    )
-    sys.exit(1)
-
-nodenames = ','.join(result.split())
-
-cmd = [ 'squeue', '-a', '-h', '-w', nodenames, '-o', '%u']
-try:
-    result = subprocess.check_output( cmd )
-except subprocess.CalledProcessError as err:
-    crier.critical(
-        'CRITICAL: squeue command failed with %s %s',
-        err.errno,
-        err.strerror
-    )
-    sys.exit(1)
+protected_users = {
+   'avahi', 'daemon', 'ganglia', 'haldaemon',
+   'halevt', 'lp', 'messagebus', 'munge', 'nobody',
+   'ntp', 'postfix', 'root', 'statd', 'syslog',
+   'www-data', 'landscape', 'sshd', 'man', 'klog'
+}
 
 
-valid_users = set(result.rstrip('\n').split('\n'))
-valid_users = valid_users.union( protected_users )
+def init_logging():
+  crier = logging.getLogger('crybaby')
+  crier.setLevel(logging.DEBUG)
+  syslog = logging.handlers.SysLogHandler(
+     address='/dev/log',
+     facility='daemon'
+  )
+  crier.addHandler(syslog)
 
-cmd = [ 'ps', '--no-headers', '-e', '-o', 'user' ]
-result = subprocess.check_output( cmd )
-running_users = set(result.rstrip('\n').split('\n'))
+  crier.info('leftover starting')
+  crier.debug('DEBUG: leftover syslog logging setup complete')
 
-invalid_users = running_users.difference( valid_users )
+  return crier
 
-if len( invalid_users ) == 0:
-    crier.debug('DEBUG: leftover found no users with invalid jobs,' +
-                'len(invalid_users)=%s', len(invalid_users) )
-    exit
 
-for u in invalid_users:
-    crier.info( 'killing processes belonging to user %s', u )
-    cmd = [ 'pkill', '-TERM', '-u', u ]
-    try:
-        result = subprocess.check_output( cmd )
-    except subprocess.CalledProcessError as err:
-        crier.debug( 'pkill exited with %s %s', err.returncode, err.message )
-        crier.error( 'ERROR: pkill could not TERM processes from %s', u )
-        continue
+def snapshot_process_table(crier):
+  # initialize process table dictionary
+  process_table = {}
 
-    sleep( 8 )
+  ps = subprocess.check_output(["ps", "-eo", "user:16,pid", "--noheaders"])
+  for proc in ps.decode('ascii').split('\n'):
+     psi = proc.split()
+     if psi and psi[0] not in protected_users:
+        try:
+           pw_uid = pwd.getpwnam(psi[0]).pw_uid
+        except KeyError:
+           crier.info("no uid for %s", psi[0])
+           pw_uid = -1
 
-    cmd = [ 'pkill', '-KILL', '-u', u ]
-    try:
-        result = subprocess.check_output( cmd )
-    except subprocess.CalledProcessError as err:
-        if err.returncode == 1:
-            crier.debug( "DEBUG: pkill exited non-zero," +
-                        "no processes left to kill" )
-            continue
+        if pw_uid < 10000:
+           protected_users.add(psi[0])
+           continue
+
+        if psi[0] in process_table:
+           process_table[psi[0]].append(psi[1])
         else:
-            crier.debug(
-                'DEBUG: pkill exited with %s %s', err.returncode, err.message
-            )
-            crier.error( 'ERROR: pkill could not KILL processes from %s', u )
-            continue
+           process_table[psi[0]] = [psi[1]]
+
+  return process_table
 
 
+def spawn_or_die(crier, cmd):
+  try:
+     result = subprocess.check_output(cmd)
+  except subprocess.CalledProcessError as err:
+     crier.critical(
+        'CRITICAL: %s command failed with %s %s', cmd[0],
+        err.errno,
+        err.strerror
+     )
+     sys.exit(1)
 
+  return result.decode('ascii')
+
+def get_slurm_aliases(crier):
+  result=spawn_or_die(crier,['scontrol','show','aliases'])
+
+  return ','.join(result.split())
+
+def get_slurm_users(crier):
+  nodenames=get_slurm_aliases(crier)
+  result=spawn_or_die(crier,['squeue','-a','-h','-w',nodenames,'-o','%u'])
+
+  return(set(result.split()))
+
+def kill_user_procs(procs,crier):
+  for proc in procs:
+     try:
+        subprocess.check_call(['kill','-9',proc])
+     except subprocess.CalledProcessError as err:
+        print("kill",proc,"returns",err)
+
+def main(args):
+  crier=init_logging()
+
+  proc_tbl=snapshot_process_table(crier)
+  slurm_users=get_slurm_users(crier)
+
+  for users,procs in proc_tbl.items():
+     if users not in slurm_users:
+        kill_user_procs(procs,crier)     
+
+if __name__ == '__main__':
+   main(sys.argv[1:])
