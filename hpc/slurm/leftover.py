@@ -11,9 +11,9 @@ protected_users = {
    'avahi', 'daemon', 'ganglia', 'haldaemon',
    'halevt', 'lp', 'messagebus', 'munge', 'nobody',
    'ntp', 'postfix', 'root', 'statd', 'syslog',
-   'www-data', 'landscape', 'sshd', 'man', 'klog'
+   'www-data', 'landscape', 'sshd', 'man', 'klog',
+   'postgres'
 }
-
 
 def init_logging():
   crier = logging.getLogger('crybaby')
