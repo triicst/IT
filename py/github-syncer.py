@@ -17,9 +17,10 @@ def main():
     arguments = parse_arguments()
         
     if arguments.watched:
-        r = requests.get("https://api.github.com/users/%s/subscriptions" % (arguments.user))
+        r = requests.get("https://api.github.com/users/%s/subscriptions?per_page=100" % (arguments.user))
     else:
-        r = requests.get("https://api.github.com/users/%s/repos" % (arguments.user))
+        r = requests.get("https://api.github.com/users/%s/repos?per_page=100" % (arguments.user))
+            # or repos?per_page=100&page=2
 
     repos = json.loads(r.content)
 
@@ -44,6 +45,9 @@ def main():
         name = names[urls.index(url)]
         ssh_url = ssh_urls[urls.index(url)]
         cmd=''
+        if name == 'Oncoscape':
+            print('ignoring Oncoscape')
+            continue # for some reason always errors in Oncoscape
         if os.path.isdir(name+'/.git'):
             cmd = 'cd %s; git remote set-url origin %s; ' % (name,url)
             cmd = cmd + 'git pull origin master; '
@@ -66,7 +70,7 @@ def main():
             cmd = cmd + 'chmod -fR g+rw %s; ' % name        
         oldmask = os.umask(arguments.umask)
         if arguments.debug:
-            print("***** DEBUG: Executing commands: %s" % cmd)
+            print("***** DEBUG: Executing commands: %s" % cmd)        
         pipe = subprocess.Popen(cmd, shell=True)
         pipe.wait()
         os.umask(oldmask)
