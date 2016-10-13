@@ -3,8 +3,7 @@
 #
 #  backing up large files 
 
-from lffunc import *
-import sys, os, getpass, argparse, logging, json, functools, tempfile
+import lflib, sys, os, getpass, argparse, logging, json, functools, tempfile
 from swiftclient.service import SwiftService
 
 #constants
@@ -33,7 +32,7 @@ logger.info('username: %s  temp: %s' % (USERNAME, tempfile.gettempdir()))
 
 def main():
     """ main entry point """
-    moin()
+    lflib.moin()
 
 def parse_arguments():
     """
