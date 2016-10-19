@@ -1,6 +1,6 @@
 # lffunc: helper functions lf-backup
 
-import sys,subprocess
+import sys,os,re,subprocess
 
 from swiftclient import shell
 from swiftclient import RequestException
@@ -153,6 +153,26 @@ def sw_post(*args):
 
 
 # end swift stuff 
+
+def get_mx_from_email_or_fqdn(addr):
+    """retrieve the first mail exchanger dns name from an email address."""
+    # Match the mail exchanger line in nslookup output.
+    MX = re.compile(r'^.*\s+mail exchanger = (?P<priority>\d+) (?P<host>\S+)\s*$')
+    # Find mail exchanger of this email address or the current host
+    if '@' in addr:
+        domain = addr.rsplit('@', 2)[1]
+    else:
+        domain = '.'.join(addr.rsplit('.')[-2:])
+    p = os.popen('/usr/bin/nslookup -q=mx %s' % domain, 'r')
+    mxes = list()
+    for line in p:
+        m = MX.match(line)
+        if m is not None:
+            mxes.append(m.group('host')[:-1])  #[:-1] just strips the ending dot
+    if len(mxes) == 0:
+        return ''
+    else:
+        return mxes[0]
 
 def send_mail(
         to,
