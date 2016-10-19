@@ -1,6 +1,6 @@
 # lffunc: helper functions lf-backup
 
-import subprocess
+import sys,subprocess
 
 from swiftclient import shell
 from swiftclient import RequestException
