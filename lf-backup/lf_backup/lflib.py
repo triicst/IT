@@ -7,8 +7,7 @@ from swiftclient import RequestException
 from swiftclient.exceptions import ClientException
 from swiftclient.multithreading import OutputManager
 
-def moin():
-    print ('moin')
+from swiftclient import Connection
 
 def easy_par(f, sequence):
     from multiprocessing import Pool
@@ -151,6 +150,39 @@ def sw_upload(*args):
 def sw_post(*args):
     sw_shell(shell.st_post,*args)
 
+# imported code to create connections to allow get_container calls
+
+swift_auth=os.environ.get("ST_AUTH")
+swift_auth_token=os.environ.get("OS_AUTH_TOKEN")
+storage_url=os.environ.get("OS_STORAGE_URL")
+
+def create_sw_conn():
+   global swift_auth,swift_auth_token,storage_url
+
+   if swift_auth_token and storage_url:
+      return Connection(preauthtoken=swift_auth_token,preauthurl=storage_url)
+
+   if swift_auth:
+      swift_user=os.environ.get("ST_USER")
+      swift_key=os.environ.get("ST_KEY")
+
+      if swift_user and swift_key:
+         return Connection(authurl=swift_auth,user=swift_user,key=swift_key)
+
+   print("Error: Swift environment not configured!")
+   sys.exit()
+
+def get_sw_container(container):
+    swift_conn=create_sw_conn()
+    if swift_conn:
+        try:
+            headers,objs=swift_conn.get_container(container,full_listing=True)
+        except ClientException:
+            print("Error: cannot access Swift container '%s'!" % container)
+
+        swift_conn.close()
+
+    return headers,objs
 
 # end swift stuff 
 

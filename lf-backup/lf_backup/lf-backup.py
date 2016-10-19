@@ -46,15 +46,18 @@ def read_csv(csv_file,field=-1):
     return csv_items
 
 # return true if object exists and size/mtime identical
-def check_stored_object(name,container,size,mtime):
-    # while in development
+def check_stored_object(name,container,container_dir,size,mtime):
+    if name in container_dir:
+       if container_dir[name][0]==size and container_dir[name][1]==mtime:
+          return True
+
     return False
 
 # file to backup, syslog object
-def backup_file(filename,container,prefix,crier):
+def backup_file(filename,container,prefix,container_dir,crier):
     global owner_files_dict
 
-    print("backing up file",filename)
+    #print("backing up file",filename)
     #crier.info("lf-backup: backing up file %s" % (filename))
 
     if prefix and filename.startswith(prefix):
@@ -62,7 +65,7 @@ def backup_file(filename,container,prefix,crier):
     else:
        destname=filename
 
-    print("container",container,"dest",destname)
+    #print("container",container,"dest",destname)
 
     try:
         statinfo=os.stat(filename)
@@ -71,7 +74,7 @@ def backup_file(filename,container,prefix,crier):
         #crier.info("lf-backup: failed to find %s" % (filename))
         return
 
-    if check_stored_object(destname,container,statinfo.st_size,
+    if check_stored_object(destname,container,container_dir,statinfo.st_size,
         statinfo.st_mtime):
         print("file",filename,"is already current")
         #crier.info("lf-backup: %s is already current" % (filename))
@@ -82,6 +85,16 @@ def backup_file(filename,container,prefix,crier):
         owner_files_dict[statinfo.st_uid].append(filename)
 
     # upload file to swift to container:destname
+
+# build db of container files by name
+def build_container_dir(container):
+    container_dir={}
+
+    c_header,c_objs=lflib.get_sw_container(container)
+    for obj in c_objs:
+        container_dir[obj['name']]=[obj['bytes'],obj['last_modified']] 
+
+    return container_dir
 
 # args from argparse, syslog object
 def backup(parse_args,crier):
@@ -94,8 +107,11 @@ def backup(parse_args,crier):
     else:
         print("Fatal error: no legal input type specified!")
 
+    container_dir=build_container_dir(parse_args.container)
+
     for file in input:
-        backup_file(file,parse_args.container,parse_args.prefix,crier)
+        backup_file(file,parse_args.container,parse_args.prefix,container_dir,
+            crier)
 
 # send SMTP mail to username containing filelist
 def mail_report(username,files):
@@ -137,7 +153,7 @@ def main():
 
     backup(parse_arguments(),crier)
 
-    mail_reports()
+    #mail_reports()
 
 if __name__ == '__main__':
     main()
