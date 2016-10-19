@@ -1,60 +1,134 @@
 #!/usr/bin/env python3
-# -*- coding: UTF-8 -*-
-#
-#  backing up large files 
 
-import lflib, sys, os, getpass, argparse, logging, json, functools, tempfile
-from swiftclient.service import SwiftService
+import argparse
+import csv
+import pwd
 
-#constants
-__app__ = "lf-backup"
-__author__ = "?"
-__company__ = "Fred Hutch, Seattle"
+import sys,os
 
-USERNAME = getpass.getuser()
-OS = sys.platform
+import logging
+import logging.handlers
 
-#variables
-_default_global_options = {}
+owner_files_dict={}
 
-logger = logging.getLogger('SWG')
-logger.setLevel(logging.DEBUG)
-# create file handler which logs even debug messages
-fh = logging.FileHandler(os.path.join(tempfile.gettempdir(),"SwiftClientGUI.debug.txt"))
-fh.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-fh.setFormatter(formatter)
-# add the handlers to the logger
-logger.addHandler(fh)
-logger.info('username: %s  temp: %s' % (USERNAME, tempfile.gettempdir()))
+# initialize logging to syslog - borrowed from leftover
+def init_logging():
+    crier=logging.getLogger('crybaby')
+    crier.setLevel(logging.DEBUG)
+    syslog=logging.handlers.SysLogHandler(
+        address='/dev/log',
+        facility='daemon'
+    )
+    crier.addHandler(syslog)
 
-### main entry point 
+    crier.info('lf-backup starting')
+    crier.debug('DEBUG: lf-backup syslog logging setup complete')
 
-def main():
-    """ main entry point """
-    lflib.moin()
+    return crier
 
+# read csv file into list using field to pick, default to final field
+def read_csv(csv_file,field=-1):
+    csv_items=[]
+
+    #crier.info("lf-backup: backing up from csv %s" % (csv_file))
+
+    try:
+        with open(csv_file) as f:
+            for row in csv.reader(f):
+                if field==-1 or (field>=0 and field<len(row)):
+                    csv_items.append(row[field])
+    except OSError:
+        print("Error: missing CSV file",csv_file)
+        #crier.info("lf-backup: failed to find csv %s" % (csv_file))
+
+    return csv_items
+
+# return true if object exists and size/mtime identical
+def check_stored_object(name,container,size,mtime):
+    # while in development
+    return False
+
+# file to backup, syslog object
+def backup_file(filename,container,prefix,crier):
+    global owner_files_dict
+
+    print("backing up file",filename)
+    #crier.info("lf-backup: backing up file %s" % (filename))
+
+    if prefix and filename.startswith(prefix):
+       destname=filename[len(prefix):]
+    else:
+       destname=filename
+
+    print("container",container,"dest",destname)
+
+    try:
+        statinfo=os.stat(filename)
+    except OSError:
+        print("Error: missing file",filename)
+        #crier.info("lf-backup: failed to find %s" % (filename))
+        return
+
+    if check_stored_object(destname,container,statinfo.st_size,
+        statinfo.st_mtime):
+        print("file",filename,"is already current")
+        #crier.info("lf-backup: %s is already current" % (filename))
+    else:
+        # append file to dict keyed to uid for later mailed report
+        if statinfo.st_uid not in owner_files_dict:
+            owner_files_dict[statinfo.st_uid]=[]
+        owner_files_dict[statinfo.st_uid].append(filename)
+
+    # upload file to swift to container:destname
+
+# args from argparse, syslog object
+def backup(parse_args,crier):
+    if parse_args.csv:
+        input=read_csv(parse_args.input)
+    elif parse_args.sql:
+        print("Error: SQL table read not yet implemented")
+        sys.exit()
+    else:
+        print("Fatal error: no legal input type specified!")
+        sys.exit()
+
+    for file in input:
+        backup_file(file,parse_args.container,parse_args.prefix,crier)
+
+# send SMTP mail to username containing filelist
+def mail_report(username,files):
+    print("mailing report to",username,"listing",files)
+
+# convert owner_files_dict into files by username and mail each
+def mail_reports():
+    global owner_files_dict
+
+    for uid,files in owner_files_dict.items():
+        mail_report(wd.getpwuid(uid).pw_name,files)
+
+# argparse config garbage
 def parse_arguments():
-    """
-    Gather command-line arguments.
-    """
-    parser = argparse.ArgumentParser(prog='lf-backup ',
-        description='a tool for backing up large files ' + \
-            '(tar.gz, zip, etc)')
-    parser.add_argument( '--debug', '-g', dest='debug', action='store_true', default=False,
-        help="verbose output for all commands")
-    parser.add_argument('--mailto', '-e', dest='mailto', action='store', default='', 
-        help='send to this email address to notify of a new deployment.')
+    parser=argparse.ArgumentParser(
+        description="Backup files to Swift from CSV or SQL")
+    group=parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("-c","--csv",help="input from CSV file",
+        action="store_true")
+    group.add_argument("-s","--sql",help="input from SQL table",
+        action="store_true")
+    parser.add_argument('input',type=str)
+    parser.add_argument("-p","--prefix",help="strip from source filename",
+        type=str)
+    parser.add_argument("-C","--container",help="destination container",
+        type=str,required=True)
 
     return parser.parse_args()
 
-if __name__ == "__main__":
-    args = parse_arguments()
-    try:
-        main()
-    except KeyboardInterrupt:
-        print('Exit !')
-        try:
-            sys.exit(0)
-        except SystemExit:
-            os._exit(0)
+def main():
+    crier=init_logging()
+
+    backup(parse_arguments(),crier)
+
+    mail_reports()
+
+if __name__ == '__main__':
+    main()
