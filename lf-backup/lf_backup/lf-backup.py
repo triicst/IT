@@ -9,6 +9,8 @@ import sys,os
 import logging
 import logging.handlers
 
+import lflib
+
 owner_files_dict={}
 
 # initialize logging to syslog - borrowed from leftover
@@ -83,28 +85,35 @@ def backup_file(filename,container,prefix,crier):
 
 # args from argparse, syslog object
 def backup(parse_args,crier):
+    input=[]
+
     if parse_args.csv:
         input=read_csv(parse_args.input)
     elif parse_args.sql:
         print("Error: SQL table read not yet implemented")
-        sys.exit()
     else:
         print("Fatal error: no legal input type specified!")
-        sys.exit()
 
     for file in input:
         backup_file(file,parse_args.container,parse_args.prefix,crier)
 
 # send SMTP mail to username containing filelist
 def mail_report(username,files):
-    print("mailing report to",username,"listing",files)
+    print("mailing report to",username)
+
+    # pretty print python list to text list
+    body=""
+    for file in files:
+       body+=(file+"\n")
+
+    lflib.send_mail(["jkatcher"],"lf-backup: files uploaded",body)
 
 # convert owner_files_dict into files by username and mail each
 def mail_reports():
     global owner_files_dict
 
     for uid,files in owner_files_dict.items():
-        mail_report(wd.getpwuid(uid).pw_name,files)
+        mail_report(pwd.getpwuid(uid).pw_name,files)
 
 # argparse config garbage
 def parse_arguments():
