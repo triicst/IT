@@ -47,12 +47,26 @@ def read_csv(csv_file,field=-1):
     return csv_items
 
 # return true if object exists and size/mtime identical
+# mtime comparison currently disabled due to format mismatch
 def check_stored_object(name,container,container_dir,size,mtime):
     if name in container_dir:
-       if container_dir[name][0]==size and container_dir[name][1]==mtime:
+       #if container_dir[name][0]==size and container_dir[name][1]==mtime:
+       if container_dir[name][0]==size:
           return True
 
     return False
+
+def generate_destname(prefix,filename):
+    if prefix and filename.startswith(prefix):
+       destname=filename[len(prefix):]
+    else:
+       destname=filename
+
+    # elide leading / from destname
+    if destname[0]=='/':
+        destname=destname[1:]
+
+    return destname
 
 # file to backup, syslog object
 def backup_file(filename,container,prefix,container_dir,crier):
@@ -61,10 +75,7 @@ def backup_file(filename,container,prefix,container_dir,crier):
     print("backing up file",filename)
     #crier.info("lf-backup: backing up file %s" % (filename))
 
-    if prefix and filename.startswith(prefix):
-       destname=filename[len(prefix):]
-    else:
-       destname=filename
+    destname=generate_destname(prefix,filename)
 
     print("container",container,"dest",destname)
 
@@ -98,7 +109,7 @@ def backup_file(filename,container,prefix,container_dir,crier):
 def build_container_dir(container):
     container_dir={}
 
-    c_header,c_objs=lflib.get_sw_container(container)
+    c_objs=lflib.get_sw_container(container)
     for obj in c_objs:
         container_dir[obj['name']]=[obj['bytes'],obj['last_modified']] 
 
@@ -116,6 +127,7 @@ def backup(parse_args,crier):
         print("Fatal error: no legal input type specified!")
 
     container_dir=build_container_dir(parse_args.container)
+    print(container_dir)
 
     for file in input:
         backup_file(file,parse_args.container,parse_args.prefix,container_dir,
