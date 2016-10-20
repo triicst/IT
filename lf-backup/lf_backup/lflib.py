@@ -11,6 +11,7 @@ from swiftclient.multithreading import OutputManager
 from swiftclient import Connection
 
 # wrapper functions for swiftclient shell functions
+
 def upload_folder_to_swift(fname,swiftname,container,meta=""):
     oldout = sys.stdout
     olderr = sys.stderr
@@ -23,15 +24,7 @@ def upload_folder_to_swift(fname,swiftname,container,meta=""):
     print("uploading to %s/%s, please wait ....." % (container,swiftname))
     sys.stdout.flush()
     tailpid=subprocess.Popen(gettailcmd(outpath))
-    final=[container,fname]
-    if meta:
-        final=meta+final
-    sw_upload("--object-name="+swiftname,
-        "--segment-size=1073741824",   # should be _default_global_options['segment_size'] but is not working
-        "--use-slo",
-        "--changed",
-        "--segment-container=.segments_"+container,
-        "--header=X-Object-Meta-Uploaded-by:"+USERNAME,*final)
+    upload_to_swift(fname,swiftname,container,meta)
     print("upload logged to %s" % outpath)
     print("SUCCESS: %s uploaded to %s/%s" % (fname,container,swiftname))
     sys.stdout = oldout
@@ -150,6 +143,17 @@ def sw_upload(*args):
 
 def sw_post(*args):
     sw_shell(shell.st_post,*args)
+
+def upload_to_swift(filename,destname,container,meta=""):
+    final=[container,filename]
+    if meta:
+        final=meta+final
+    sw_upload("--object-name="+destname,
+        "--segment-size="+_default_global_options['segment_size'],
+        "--use-slo",
+        "--changed",
+        "--segment-container=.segments_"+container,
+        "--header=X-Object-Meta-Uploaded-by:"+getpass.getuser(),*final)
 
 # imported code to create connections to allow get_container calls
 

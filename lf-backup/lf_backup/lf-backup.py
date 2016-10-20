@@ -96,14 +96,8 @@ def backup_file(filename,container,prefix,container_dir,crier):
             owner_files_dict[statinfo.st_uid]=[]
         owner_files_dict[statinfo.st_uid].append(filename)
 
-    # upload file to swift to container:destname
-    final=[container,filename]
-    lflib.sw_upload("--object-name="+destname,
-        "--segment-size=1073741824",
-        "--use-slo",
-        "--changed",
-        "--segment-container=.segments_"+container,
-        "--header=X-Object-Meta-Uploaded-by:"+getpass.getuser(),*final)
+        # upload file to swift to container:destname
+        lflib.upload_to_swift(filename,destname,container)
 
 # build db of container files by name
 def build_container_dir(container):
