@@ -1,6 +1,7 @@
 # lffunc: helper functions lf-backup
 
-import sys,os,re,subprocess
+import sys,os,re,tempfile,getpass,socket,optparse
+import subprocess
 
 from swiftclient import shell
 from swiftclient import RequestException
@@ -9,33 +10,8 @@ from swiftclient.multithreading import OutputManager
 
 from swiftclient import Connection
 
-def easy_par(f, sequence):
-    from multiprocessing import Pool
-    poolsize=len(sequence)
-    if poolsize > 16:
-        poolsize = 16
-    pool = Pool(processes=poolsize)
-    try:
-        # f is given sequence. guaranteed to be in order
-        cleaned=False
-        result = pool.map(f, sequence)
-        cleaned = [x for x in result if not x is None]
-        #cleaned = asarray(cleaned)
-        # not optimal but safe
-    except KeyboardInterrupt:
-        pool.terminate()
-    except Exception as e:
-        print('got exception: %r' % (e,))
-        if not args.force:
-            print("Terminating the pool")
-            pool.terminate()
-    finally:
-        pool.close()
-        pool.join()
-        return cleaned
-
 # wrapper functions for swiftclient shell functions
-def upload_folder_to_swift(fname,swiftname,container,meta):
+def upload_folder_to_swift(fname,swiftname,container,meta=""):
     oldout = sys.stdout
     olderr = sys.stderr
     outfile = 'Swift_upload_'+container+'_'+swiftname.rstrip('/').replace('/','_')+".log"
@@ -83,6 +59,31 @@ def download_folder_from_swift(fname,swiftname,container):
     sys.stdout = oldout
     sys.stderr = olderr
     fh.close()
+
+USERNAME = getpass.getuser()
+OS = sys.platform
+IP = socket.gethostbyname(socket.gethostname())
+    
+_default_global_options = {
+    "segment_size": '1073741824',
+    "use_slo": True,
+    "changed": True,
+    "auth_version": os.environ.get('ST_AUTH_VERSION',(os.environ.get('OS_AUTH_VERSION','1.0'))),
+    "auth": os.environ.get('ST_AUTH', 'https://tin.fhcrc.org/auth/v1.0'),
+    "user": os.environ.get('ST_USER', USERNAME),
+    "key": os.environ.get('ST_KEY', ''),
+    "retries": 5,
+    "os_username": os.environ.get('OS_USERNAME', USERNAME),
+    "os_password": os.environ.get('OS_PASSWORD', ''),
+    "os_tenant_id": os.environ.get('OS_TENANT_ID'),
+    "os_tenant_name": os.environ.get('OS_TENANT_NAME', ''),
+    "os_auth_url": os.environ.get('OS_AUTH_URL', 'https://tin.fhcrc.org/auth/v2.0'),
+    "os_auth_token": os.environ.get('OS_AUTH_TOKEN'),       
+    "os_storage_url": os.environ.get('OS_STORAGE_URL'),  
+    "os_region_name": os.environ.get('OS_REGION_NAME', 'default'),
+    "os_service_type": os.environ.get('OS_SERVICE_TYPE'),
+    "os_endpoint_type": os.environ.get('OS_ENDPOINT_TYPE'),        
+}
 
 def shell_minimal_options():
 
@@ -173,12 +174,16 @@ def create_sw_conn():
    sys.exit()
 
 def get_sw_container(container):
+    headers=''
+    objs=''
+
     swift_conn=create_sw_conn()
     if swift_conn:
         try:
             headers,objs=swift_conn.get_container(container,full_listing=True)
         except ClientException:
             print("Error: cannot access Swift container '%s'!" % container)
+            sys.exit()
 
         swift_conn.close()
 
