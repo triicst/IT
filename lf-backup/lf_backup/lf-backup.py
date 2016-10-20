@@ -72,12 +72,11 @@ def generate_destname(prefix,filename):
 def backup_file(filename,container,prefix,container_dir,crier):
     global owner_files_dict
 
-    print("backing up file",filename)
-    #crier.info("lf-backup: backing up file %s" % (filename))
+    #print("considering file",filename)
 
     destname=generate_destname(prefix,filename)
 
-    print("container",container,"dest",destname)
+    #print("container",container,"dest",destname)
 
     try:
         statinfo=os.stat(filename)
@@ -97,6 +96,8 @@ def backup_file(filename,container,prefix,container_dir,crier):
         owner_files_dict[statinfo.st_uid].append(filename)
 
         # upload file to swift to container:destname
+        print("uploading file",filename)
+        #crier.info("lf-backup: uploading file %s" % (filename))
         lflib.upload_to_swift(filename,destname,container)
 
 # build db of container files by name
