@@ -5,6 +5,7 @@ import csv
 import pwd
 
 import sys,os
+import getpass
 
 import logging
 import logging.handlers
@@ -57,7 +58,7 @@ def check_stored_object(name,container,container_dir,size,mtime):
 def backup_file(filename,container,prefix,container_dir,crier):
     global owner_files_dict
 
-    #print("backing up file",filename)
+    print("backing up file",filename)
     #crier.info("lf-backup: backing up file %s" % (filename))
 
     if prefix and filename.startswith(prefix):
@@ -65,7 +66,7 @@ def backup_file(filename,container,prefix,container_dir,crier):
     else:
        destname=filename
 
-    #print("container",container,"dest",destname)
+    print("container",container,"dest",destname)
 
     try:
         statinfo=os.stat(filename)
@@ -85,6 +86,13 @@ def backup_file(filename,container,prefix,container_dir,crier):
         owner_files_dict[statinfo.st_uid].append(filename)
 
     # upload file to swift to container:destname
+    final=[container,filename]
+    lflib.sw_upload("--object-name="+destname,
+        "--segment-size=1073741824",
+        "--use-slo",
+        "--changed",
+        "--segment-container=.segments_"+container,
+        "--header=X-Object-Meta-Uploaded-by:"+getpass.getuser(),*final)
 
 # build db of container files by name
 def build_container_dir(container):
@@ -122,7 +130,7 @@ def mail_report(username,files):
     for file in files:
        body+=(file+"\n")
 
-    lflib.send_mail(["jkatcher"],"lf-backup: files uploaded",body)
+    lflib.send_mail([username],"lf-backup: files uploaded",body)
 
 # convert owner_files_dict into files by username and mail each
 def mail_reports():
