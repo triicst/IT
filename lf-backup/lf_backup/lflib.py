@@ -153,12 +153,10 @@ def sw_post(*args):
 
 # imported code to create connections to allow get_container calls
 
-swift_auth=os.environ.get("ST_AUTH")
-swift_auth_token=os.environ.get("OS_AUTH_TOKEN")
-storage_url=os.environ.get("OS_STORAGE_URL")
-
 def create_sw_conn():
-   global swift_auth,swift_auth_token,storage_url
+   swift_auth=_default_global_options['auth']
+   swift_auth_token=_default_global_options['os_auth_token']
+   storage_url=_default_global_options['os_storage_url']
 
    if swift_auth_token and storage_url:
       return Connection(preauthtoken=swift_auth_token,preauthurl=storage_url)
@@ -174,7 +172,6 @@ def create_sw_conn():
    sys.exit()
 
 def get_sw_container(container):
-    headers=''
     objs=''
 
     swift_conn=create_sw_conn()
@@ -187,7 +184,7 @@ def get_sw_container(container):
 
         swift_conn.close()
 
-    return headers,objs
+    return objs
 
 # end swift stuff 
 
