@@ -5,7 +5,10 @@
 #  interaction with the openstack swift object store 
 # 
 # 10.24.2016 - bmcgough
-#    modified to use Lmod correctly (as root) and source old modulefiles as EB Python does not include swictclient
+#    modified to use Lmod correctly (as root)
+#    source old modulefiles as EB Python does not include swictclient
+#    avoid bash 'if [ -d $INVALID_ENV_VAR ]' as that returns true
+
 
 scriptname=${0##*/}
 cwd=$(pwd)
