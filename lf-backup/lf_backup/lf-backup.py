@@ -178,7 +178,7 @@ def main():
 
     backup(parse_arguments(),crier)
 
-    #mail_reports()
+    mail_reports()
 
 if __name__ == '__main__':
     main()
