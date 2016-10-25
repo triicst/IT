@@ -131,7 +131,7 @@ def backup(parse_args,crier):
     container_dir=build_container_dir(parse_args.container)
 
     # build parallel parameter list
-    segments=list(map(lambda x:[x,parse_args,container_dir,crier],input))
+    segments=[[e,parse_args,container_dir,crier] for e in input]
 
     p=multiprocessing.Pool(parse_args.parallel)
     p.map(backup_file_mp,segments)
