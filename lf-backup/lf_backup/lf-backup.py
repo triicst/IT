@@ -7,6 +7,8 @@ import pwd
 import sys,os
 import getpass
 
+import multiprocessing
+
 import logging
 import logging.handlers
 
@@ -110,6 +112,11 @@ def build_container_dir(container):
 
     return container_dir
 
+# shell to call backup_file with correct separate parameters
+# each parameter is [filename,parse_args,container_dir,crier]
+def backup_file_mp(x):
+    backup_file(x[0],x[1].container,x[1].prefix,x[2],x[3])
+
 # args from argparse, syslog object
 def backup(parse_args,crier):
     input=[]
@@ -122,11 +129,12 @@ def backup(parse_args,crier):
         print("Fatal error: no legal input type specified!")
 
     container_dir=build_container_dir(parse_args.container)
-    print(container_dir)
 
-    for file in input:
-        backup_file(file,parse_args.container,parse_args.prefix,container_dir,
-            crier)
+    # build parallel parameter list
+    segments=list(map(lambda x:[x,parse_args,container_dir,crier],input))
+
+    p=multiprocessing.Pool(parse_args.parallel)
+    p.map(backup_file_mp,segments)
 
 # send SMTP mail to username containing filelist
 def mail_report(username,files):
@@ -160,6 +168,8 @@ def parse_arguments():
         type=str)
     parser.add_argument("-C","--container",help="destination container",
         type=str,required=True)
+    parser.add_argument("-P","--parallel",help="number of parallel workers",
+        type=int,default=5)
 
     return parser.parse_args()
 
