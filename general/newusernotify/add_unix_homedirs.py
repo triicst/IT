@@ -10,6 +10,9 @@ in list titignoreset are ignored.
 
 import sys, os, argparse, json, requests, subprocess
 
+mailuser = 'petersen'
+tmpdir = '/var/tmp'
+
 # job titles that do not require an account. 
 titignore = ["Program Assistant", "Data Coordinator", "Project Coordinator", 
              "Administrative Assistant", "Administrative Coordinator", 
@@ -35,12 +38,13 @@ def main():
     # adding users #########################################
 
     uids = uniq(jget(j, 'employeeID'))
-    uids_add, uids_del = listcompare('/var/tmp/uids_last.json', uids)
+    uids_add, uids_del = listcompare('%s/uids_last.json' % tmpdir, uids)
+    uids_add_filt = []
 
     # adding new users but never more than 1000
     x = len(uids_add) - 1
     if x > 100: x = 100
-    print("\nAdding %s users...:" % len(uids_add), uids_add[0:x])
+    print("\nChecking %s users...:" % len(uids_add), uids_add[0:x])
     n = 1
     if len(uids_add) <= 1000:
         for uid in uids_add:
@@ -49,9 +53,15 @@ def main():
             if jsearchone(j,"employeeID",uid,"mail") == "" or jsearchone(j,"employeeID",uid,"title") in titignore:
                 continue
 
+            uids_add_filt.append(uid)
             with open(os.path.join(args.dir,str(uid)), 'w') as outfile:
                 outfile.write('create a homedir')
             n+=1
+            
+            
+        if len(uids_add_filt) > 0:
+            mailnewusers(j, uids_add_filt)
+            
     else:
         print('Error: will not add batches of more than 1000 users')
 
@@ -70,13 +80,33 @@ def main():
 
 	# save the list of currently processed uids 
 
-    with open('/var/tmp/uids_last.json', 'w') as outfile:
+    with open('%s/uids_last.json' % tmpdir, 'w') as outfile:
         json.dump(uids, outfile)
 
 
 ########################################################################
 
 # some helper functions
+
+def mailnewusers(j, uids_add):
+    print('notify on uids:', uids_add)
+    rows = []
+    for uid in uids_add:
+        row = jgetonerow(j, "employeeID", uid)
+        rows.append(row)
+    
+    body = json.dumps(rows, sort_keys=True, indent=4)    
+    #body = json2htm (body)
+        
+    try:
+        send_mail(['%s@fredhutch.org' % mailuser,], "created new Unix home dirs for %s users(s)" % len(uids_add),
+                body)
+    #    print ('\nSent file delete warning to user %s' % mailuser)
+    except:
+        e=sys.exc_info()[0]
+        sys.stderr.write("Error in send_mail while sending to '%s': %s\n" % (mailuser, e))
+        send_mail(['petersen@fredhutch.org',], "Error - unix-homedirs",
+                "Please debug email notification to user '%s', Error: %s\n" % (mailuser, e))
 
 def listcompare(oldjsonfile,newlist):
 	""" compares a list with a previously saved list and returns
@@ -97,6 +127,14 @@ def jsearch(json,sfld,search,rfld):
         if j[sfld]==search or search == '*':
             lst.append(j[rfld].strip())
     return lst
+
+    
+def jgetonerow(j,sfld,search):
+    """ return a row based  on a search """
+
+    for row in j:
+        if row[sfld]==search or search == '*':
+            return row
 
 def jsearchone(json,sfld,search,rfld):
     """ return the first search result of a column based search """
@@ -119,6 +157,29 @@ def uniq(seq):
     for e in seq:
         keys[e] = 1
     return list(keys.keys())
+
+
+def json2htm(j):
+    htmlresult = """<table>
+                     <thead>
+                 <tr>"""    
+    for var in json["head"]["vars"]:
+        htmlresult += "<th>%s</th>" % var
+        
+    htmlresult += "</tr></thead><tbody>"
+
+    for result in json["results"]["bindings"]:
+        htmlresult += "<tr>"
+    for var in json["head"]["vars"]:
+        if result[var]["value"]:
+            htmlresult += "<td>%s</td>" % result[var]["value"]
+    htmlresult += "</tr>"
+    htmlresult +="""
+                </tbody>
+                </table>
+                """
+    return htmlresult
+
 
 class ScriptException(Exception):
     def __init__(self, returncode, stdout, stderr, script):
@@ -233,6 +294,27 @@ def send_mail(to, subject, text, attachments=[], cc=[], bcc=[], smtphost="", fro
 
     return True
 
+
+def get_mx_from_email_or_fqdn(addr):
+    """retrieve the first mail exchanger dns name from an email address."""
+    import re
+    # Match the mail exchanger line in nslookup output.
+    MX = re.compile(r'^.*\s+mail exchanger = (?P<priority>\d+) (?P<host>\S+)\s*$')
+    # Find mail exchanger of this email address or the current host
+    if '@' in addr:
+        domain = addr.rsplit('@', 2)[1]
+    else:
+        domain = '.'.join(addr.rsplit('.')[-2:])
+    p = os.popen('/usr/bin/nslookup -q=mx %s' % domain, 'r')
+    mxes = list()
+    for line in p:
+        m = MX.match(line)
+        if m is not None:
+            mxes.append(m.group('host')[:-1])  #[:-1] just strips the ending dot
+    if len(mxes) == 0:
+        return ''
+    else:
+        return mxes[0]
 
 def parse_arguments():
     """
