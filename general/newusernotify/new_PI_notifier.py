@@ -6,7 +6,9 @@ Notify Helpdesk if a new Faculty Member / PI is added to Peoplesoft
 
 import sys, os, argparse, json, requests, subprocess
 
-mailuser = 'petersen'
+mailusers = ['helpdesk', 'cit-sc',]
+mailerrorusers = ['petersen',]
+
 tmpdir = '/var/tmp'
 
 # the user database of potential scientific computing users
@@ -67,13 +69,13 @@ def mailnewpi(row, body):
     body = body + '\n\n' + json.dumps(row, sort_keys=True, indent=4)
     
     try:
-        send_mail(['%s@fredhutch.org' % mailuser,], "NEW Faculty/PI: Please create storage folders",
+        send_mail(mailusers, "NEW Faculty/PI: Please create storage folders",
                 body)
     except:
         e=sys.exc_info()[0]
-        sys.stderr.write("Error in send_mail while sending to '%s': %s\n" % (mailuser, e))
-        send_mail(['petersen@fredhutch.org',], "Error - unix-homedirs",
-                "Please debug email notification to user '%s', Error: %s\n" % (mailuser, e))
+        sys.stderr.write("Error in send_mail while sending to '%s': %s\n" % (mailerrorusers[0], e))
+        send_mail(mailerrorusers, "Error - NEW Faculty/PI",
+                "Please debug email notification to user '%s', Error: %s\n" % (mailerrorusers[0], e))
 
 def listcompare(oldjsonfile,newlist):
 	""" compares a list with a previously saved list and returns
@@ -94,7 +96,6 @@ def jsearch(json,sfld,search,rfld):
         if j[sfld]==search or search == '*':
             lst.append(j[rfld].strip())
     return lst
-
     
 def jgetonerow(j,sfld,search):
     """ return a row based  on a search """
@@ -287,8 +288,8 @@ def parse_arguments():
     """
     Gather command-line arguments.
     """
-    parser = argparse.ArgumentParser(prog='add_unix_homedirs',
-        description='a tool for deploying resources from proxmox ' + \
+    parser = argparse.ArgumentParser(prog='pi_notifier',
+        description='a tool for notiifying support that a new PI has arrived ' + \
             '(LXC containers or VMs)')
     parser.add_argument( '--debug', '-d', dest='debug', action='store_true', default=False,
         help="do not send an email but print the result to  console")

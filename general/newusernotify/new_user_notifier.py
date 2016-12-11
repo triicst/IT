@@ -1,67 +1,68 @@
 #! /usr/bin/env python3
 
 """
-if new users are detected this script drops their 5 digit uidNumbers into
-a folder where another script triggers the creation of posix home
-directories.
-Users that do not have an email address and users with job descriptions 
-in list titignoreset are ignored.
+if new users are detected this script notifies a list of division staff.
+Users with job descriptions in list titignore are ignored.
 """
 
 import sys, os, argparse, json, requests, subprocess
 
-mailusers = ['cit-sc',]
+maildict={}
+
+maildict['FH'] = ['']
+maildict['AD'] = ['']
+maildict['BS'] = ['']
+maildict['CR'] = ['']
+maildict['CB'] = [''] # this is Human Biology
+maildict['HD'] = ['petersen']  # this is HDC
+maildict['PH'] = ['phshelpdesk',]
+maildict['VI'] = ['']
+maildict['SR'] = ['']
+
 mailerrorusers = ['petersen',]
 tmpdir = '/var/tmp'
 
 # job titles that do not require an account. 
-titignore = ["Program Assistant", "Data Coordinator", "Project Coordinator", 
-             "Administrative Assistant", "Administrative Coordinator", 
-             "Office Worker", "Data Operations Manager", 
-             "Clinical Research Coordinator", "Administrative Manager", 
-             "Data Entry Operator", "Clinical Research Nurse", 
-             "Veterinary Technician", "Animal Equipment Preparer", 
-             "Program Administrator", "Senior Project Manager", 
-             "Coordinating Center Manager", "Animal Technician", 
-             "Member Emeritus", "Nurse Manager", "Financial Analyst", 
-             "Yoga Teacher", ""]
+titignore = ["Yoga Teacher",]
 
 # the user database of potential scientific computing users
-j = requests.get('https://toolbox.fhcrc.org/json/sc_users.json').json()
+j = requests.get('https://toolbox.fhcrc.org/json/users_all.json').json()
 
 
 def main():
 
-    if not os.path.exists(args.dir):
-        print ('Output directory %s does not exist' % args.dir)
-        return False
-
     # adding users #########################################
 
     uids = uniq(jget(j, 'employeeID'))
-    uids_add, uids_del = listcompare('%s/uids_last.json' % tmpdir, uids)
-    uids_add_filt = []
+    uids_add, uids_del = listcompare('%s/uids_all_last.json' % tmpdir, uids)
+    
+    uids_add_filt = {}
+    for m in maildict.keys():
+        uids_add_filt[m] = []
+    #print ('xxxxxxxxxxxxxxxxxxxxxx', uids_add_filt)
 
     # adding new users but never more than 1000
     x = len(uids_add) - 1
     if x > 100: x = 100
-    print("\nChecking %s users...:" % len(uids_add), uids_add[0:x])
+    #print("\nChecking %s users...:" % len(uids_add), uids_add[0:x])
     n = 1
     if len(uids_add) <= 1000:
         for uid in uids_add:
-            print('%s: %s' % (n,uid))
+            #print('%s: %s' % (n,uid))
             # ignore some jobtitles 
-            if jsearchone(j,"employeeID",uid,"mail") == "" or jsearchone(j,"employeeID",uid,"title") in titignore:
+            if jsearchone(j,"employeeID",uid,"title") in titignore:
                 continue
 
-            uids_add_filt.append(uid)
-            with open(os.path.join(args.dir,str(uid)), 'w') as outfile:
-                outfile.write('create a homedir')
+            div = jsearchone(j,"employeeID",uid,"division")
+            if div:
+                uids_add_filt[div].append(uid)
+                uids_add_filt['FH'].append(uid)
+
             n+=1
             
-            
-        if len(uids_add_filt) > 0:
-            mailnewusers(j, uids_add_filt)
+        #if len(uids_add_filt) > 0:
+        #    #print('mailme:', uids_add_filt)
+        mailnewusers(j, uids_add_filt)
             
     else:
         print('Error: will not add batches of more than 1000 users')
@@ -81,7 +82,7 @@ def main():
 
 	# save the list of currently processed uids 
 
-    with open('%s/uids_last.json' % tmpdir, 'w') as outfile:
+    with open('%s/uids_all_last.json' % tmpdir, 'w') as outfile:
         json.dump(uids, outfile)
 
 
@@ -91,23 +92,29 @@ def main():
 
 def mailnewusers(j, uids_add):
     print('notify on uids:', uids_add)
-    rows = []
-    for uid in uids_add:
-        row = jgetonerow(j, "employeeID", uid)
-        rows.append(row)
-    
-    body = json.dumps(rows, sort_keys=True, indent=4)    
-    #body = json2htm (body)
-        
-    try:
-        send_mail(mailusers, "created new Unix home dirs for %s users(s)" % len(uids_add),
-                body)
-    #    print ('\nSent file delete warning to user %s' % mailuser)
-    except:
-        e=sys.exc_info()[0]
-        sys.stderr.write("Error in send_mail while sending to '%s': %s\n" % (mailerrorusers[0], e))
-        send_mail(mailerrorusers, "Error - unix-homedirs",
-                "Please debug email notification to user '%s', Error: %s\n" % (mailerrorusers[0], e))
+    for div, uids in uids_add.items():
+        rows = []
+        for uid in uids:
+            row = jgetonerow(j, "employeeID", uid)
+            rows.append(row)
+                
+        if len (rows) > 0 and maildict[div] != '':
+            #body = """new users extracted from
+            #https://toolbox.fhcrc.org/json/users_all.json
+            #"""
+            body = json.dumps(rows, sort_keys=True, indent=4)    
+            #body = json2htm (body)
+            #print(body)
+                
+            try:
+                send_mail(maildict[div], "NEW USER(S): Division %s gets %s" % (div,len(uids)),
+                        body)
+
+            except:
+                e=sys.exc_info()[0]
+                sys.stderr.write("Error in send_mail while sending to '%s': %s\n" % (mailerrorusers[0], e))
+                send_mail(mailerrorusers, "Error - unix-homedirs",
+                        "Please debug email notification to user '%s', Error: %s\n" % (mailerrorusers[0], e))
 
 def listcompare(oldjsonfile,newlist):
 	""" compares a list with a previously saved list and returns
