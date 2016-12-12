@@ -6,9 +6,9 @@ Godu uses goroutines for concurrency and threads for parallelization. Each direc
 ## Usage
 
 ```
-Usage: bin/godu [-v, -t int] topdir1 topdirN
+Usage: ./godu [-v, -t int] topdir1 topdirN
 
-Example: bin/godu -v /home/rmcdermo /fh/fast/mcdermott_r /fh/secure/research/mcdermott_r
+Example: ./godu -v /home/rmcdermo /fh/fast/mcdermott_r /fh/secure/research/mcdermott_r
 
   -t int
         Optional: set number of threads, defaults to number of logical cores (default 56)
