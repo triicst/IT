@@ -21,4 +21,4 @@ Compiled binary versions of godu are available via the links below:
 
 - [Linux x64](https://github.com/FredHutch/IT/raw/master/filetools/godu/bin/godu "https://github.com/FredHutch/IT/raw/master/filetools/godu/bin/godu")
 
-- [Windows x64](https://github.com/FredHutch/IT/raw/master/filetools/godu/bin/godu "https://github.com/FredHutch/IT/raw/master/filetools/godu/bin/godu.ext")
+- [Windows x64](https://github.com/FredHutch/IT/raw/master/filetools/godu/bin/godu.exe "https://github.com/FredHutch/IT/raw/master/filetools/godu/bin/godu.exe")
