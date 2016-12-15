@@ -58,10 +58,22 @@ def main():
             with open(os.path.join(args.dir,str(uid)), 'w') as outfile:
                 outfile.write('create a homedir')
             n+=1
-            
-            
+
+        # attempt to create a slurm account             
+        slurmerr = []
+        for uidNumber in uids_add_filt:
+            username = jsearchone(j,"employeeID",uidNumber,"uid")
+            j1 = requests.get('https://toolbox.fhcrc.org/mapaccount/rest/%s' % username).json()            
+            if len(j1[username]) > 0:
+                PI = j1[username][0]
+                #print('PI:', j1[username][0])
+                ret = subprocess.run("sacctmgr -i create user %s account=%s defaultaccount=%s" % (username, PI, PI), shell=True).returncode
+                if ret:
+                    slurmerr.append(username)
+                    
+        
         if len(uids_add_filt) > 0:
-            mailnewusers(j, uids_add_filt)
+            mailnewusers(j, uids_add_filt, slurmerr)
             
     else:
         print('Error: will not add batches of more than 1000 users')
@@ -89,20 +101,25 @@ def main():
 
 # some helper functions
 
-def mailnewusers(j, uids_add):
+def mailnewusers(j, uids_add, slurmerr):
+    
+    body = ''
+    if len(slurmerr) > 0:
+        body = 'Slurm accounts could NOT be created for users: %s' % ", ".join(slurmerr)
+        
     print('notify on uids:', uids_add)
     rows = []
     for uid in uids_add:
         row = jgetonerow(j, "employeeID", uid)
         rows.append(row)
     
-    body = json.dumps(rows, sort_keys=True, indent=4)    
+    body = body + '\n\n' + json.dumps(rows, sort_keys=True, indent=4)    
     #body = json2htm (body)
         
     try:
         send_mail(mailusers, "created new Unix home dirs for %s users(s)" % len(uids_add),
                 body)
-    #    print ('\nSent file delete warning to user %s' % mailuser)
+
     except:
         e=sys.exc_info()[0]
         sys.stderr.write("Error in send_mail while sending to '%s': %s\n" % (mailerrorusers[0], e))
