@@ -39,6 +39,20 @@ def create_sw_conn(hostname=""):
     print("Error: Swift environment not configured!")
     sys.exit()
 
+results=[]
+
+def output_results(file,host,create,put,get,delete):
+    global results
+
+    if host=='':
+        host=socket.gethostname()
+    else:
+        #print(host)
+        results.append([host,create,put,get,delete])
+
+    with open(file,'a') as f:
+        print("%s,%s,%s,%s,%s" % (host,create,put,get,delete),file=f)
+
 def run_test(parse_args,hostname,test_data):
     start_time=datetime.datetime.now()
     sc=create_sw_conn(hostname)    
@@ -56,13 +70,9 @@ def run_test(parse_args,hostname,test_data):
 
         sc.close()
 
-    with open(parse_args.file,'a') as f:
-        if hostname=='':
-            hostname=socket.gethostname()
-        print("%s,%s,%s,%s,%s,%s" % 
-            (start_time,hostname,create_sw_time-start_time,
-                put_time-create_sw_time,get_time-put_time,
-                delete_time-put_time),file=f)
+    output_results(parse_args.file,hostname,
+        create_sw_time-start_time,put_time-create_sw_time,get_time-put_time,
+        delete_time-put_time)
 
 def load_nodefile(nodefile):
     lines=[]
@@ -74,6 +84,28 @@ def load_nodefile(nodefile):
 
     return lines
 
+def print_report():
+    global results
+
+    notime=datetime.timedelta(0)
+    low=[[notime,''],[notime,''],[notime,''],[notime,'']]
+    high=[[notime,''],[notime,''],[notime,''],[notime,'']]
+    total=[notime,notime,notime,notime]
+
+    for result in results:
+        for i in range(0,4):
+            if low[i][1]=='' or result[i+1]<low[i][0]:
+                low[i]=[result[i+1],result[0]]
+            if high[i][1]=='' or result[i+1]>high[i][0]:
+                high[i]=[result[i+1],result[0]]
+            total[i]+=result[i+1]
+
+    i=0
+    for item in ['connect','put','get','delete']:
+        print("%s: low %s:%s high %s:%s avg %s" % (item,low[i][0],low[i][1],
+            high[i][0],high[i][1],total[i]/len(results)))
+        i+=1
+
 def run_tests(parse_args):
     test_data=create_test_data(parse_args.size)
 
@@ -81,6 +113,7 @@ def run_tests(parse_args):
         nodes=load_nodefile(parse_args.nodelist)
         for node in nodes:
             run_test(parse_args,node,test_data)
+        print_report()
     else:
         while True:
             run_test(parse_args,'',test_data)
