@@ -11,7 +11,7 @@ To use this script the following conditions must be met:
 - The checksum files must contain the md5 checksum data in the same output format used by the 'md5sum' command.
 - The local directory designated to use for the download and verification; needs to be at least as large as the largest object in the bucket.
 
-In addtion to the above requirements, it's best if you use and EC2 instance with enhanced networking support (10Gb/s) that is properly enabled (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/enhanced-networking.html#enabling_enhanced_networking). You'll also get much better transfer performance if your VPC has an S3 endpoint configured (http://docs.aws.amazon.com/AmazonVPC/latest/UserGuide/vpc-endpoints.html). If you run this from an instance located on Campus, it will take forever and burn up the internet connection if used with a large dataset; it will also be expensive as you will be paying for egress.
+In addtion to the above requirements, it's best if you use an EC2 instance with enhanced networking support (10Gb/s) that is properly enabled (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/enhanced-networking.html#enabling_enhanced_networking). You'll also get much better transfer performance if your VPC has an S3 endpoint configured (http://docs.aws.amazon.com/AmazonVPC/latest/UserGuide/vpc-endpoints.html). If you run this from an instance located on Campus, it will take forever and burn up the internet connection if used with a large dataset; it will also be expensive as you will be paying for egress.
 
 ###Usage: 
 
