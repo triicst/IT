@@ -85,9 +85,7 @@ def load_nodefile(nodefile):
 
     return lines
 
-def print_report():
-    global results
-
+def print_report(results):
     notime=datetime.timedelta(0)
     low=[[notime,''],[notime,''],[notime,''],[notime,'']]
     high=[[notime,''],[notime,''],[notime,''],[notime,'']]
@@ -121,7 +119,7 @@ def run_tests(parse_args):
             run_test(parse_args,node,test_data)
 
         if parse_args.nodelist:
-            print_report()
+            print_report(results)
             results=[]
 
         if parse_args.iterations>0:
