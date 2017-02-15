@@ -2,7 +2,7 @@
 
 import argparse
 import random
-import os
+import os, sys
 import socket
 import datetime
 import time
