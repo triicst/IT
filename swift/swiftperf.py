@@ -5,6 +5,7 @@ import random
 import os
 import socket
 import datetime
+import time
 
 import swiftclient
 
@@ -93,7 +94,7 @@ def print_report():
     total=[notime,notime,notime,notime]
 
     for result in results:
-        for i in range(0,4):
+        for i in range(0,len(total)):
             if low[i][1]=='' or result[i+1]<low[i][0]:
                 low[i]=[result[i+1],result[0]]
             if high[i][1]=='' or result[i+1]>high[i][0]:
@@ -107,16 +108,29 @@ def print_report():
         i+=1
 
 def run_tests(parse_args):
-    test_data=create_test_data(parse_args.size)
+    global results
 
+    test_data=create_test_data(parse_args.size)
     if parse_args.nodelist:
         nodes=load_nodefile(parse_args.nodelist)
+    else:
+        nodes=['']
+
+    while True:
         for node in nodes:
             run_test(parse_args,node,test_data)
-        print_report()
-    else:
-        while True:
-            run_test(parse_args,'',test_data)
+
+        if parse_args.nodelist:
+            print_report()
+            results=[]
+
+        if parse_args.iterations>0:
+           parse_args.iterations-=1
+        elif parse_args.iterations==0:
+           break
+
+        if parse_args.delay>0:
+            time.sleep(parse_args.delay)
 
 # argparse config garbage
 def parse_arguments():
@@ -132,6 +146,10 @@ def parse_arguments():
         type=str,default='swiftperf')
     parser.add_argument("-s","--size",help="size of test object",
         type=int,default=1048576)
+    parser.add_argument("-d","--delay",help="delay between runs in seconds",
+        type=int,default=1)
+    parser.add_argument("-i","--iterations",help="iterations (-1 infinite)",
+        type=int,default=-1)
 
     return parser.parse_args()
 
