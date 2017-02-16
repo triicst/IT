@@ -30,12 +30,12 @@ def create_sw_conn(hostname=""):
     swift_user=os.environ.get("ST_USER")
     swift_key=os.environ.get("ST_KEY")
 
-    if swift_auth and hostname:
-        swift_auth="https://"+hostname+"/auth/v1.0"
-
-    if swift_auth and swift_user and swift_key:
-        return swiftclient.Connection(authurl=swift_auth,user=swift_user,
-            key=swift_key)
+    if swift_auth:
+        if hostname:
+            swift_auth="https://"+hostname+"/auth/v1.0"
+        if swift_user and swift_key:
+            return swiftclient.Connection(authurl=swift_auth,user=swift_user,
+                key=swift_key)
 
     print("Error: Swift environment not configured!")
     sys.exit()
@@ -43,16 +43,13 @@ def create_sw_conn(hostname=""):
 def td_sec(td):
     return td.total_seconds()
 
-results=[]
-
 def output_results(file,host,start,create,put,get,delete):
-    global results
-
     if host=='':
         host=socket.gethostname()
+        result=[]
     else:
         #print(host)
-        results.append([host,create,put,get,delete])
+        result=[host,create,put,get,delete]
 
     with open(file,'a') as f:
         if f.tell()==0:
@@ -60,6 +57,8 @@ def output_results(file,host,start,create,put,get,delete):
 
         print("%s,%s,%f,%f,%f,%f" % (start,host,td_sec(create),td_sec(put),
             td_sec(get),td_sec(delete)),file=f)
+
+    return result
 
 def run_test(parse_args,hostname,test_data):
     start_time=datetime.datetime.now()
@@ -78,7 +77,7 @@ def run_test(parse_args,hostname,test_data):
 
         sc.close()
 
-    output_results(parse_args.file,hostname,start_time,
+    return output_results(parse_args.file,hostname,start_time,
         create_sw_time-start_time,put_time-create_sw_time,get_time-put_time,
         delete_time-put_time)
 
@@ -94,8 +93,7 @@ def load_nodefile(nodefile):
 
 def print_report(results):
     notime=datetime.timedelta(0)
-    low=[[notime,''],[notime,''],[notime,''],[notime,'']]
-    high=[[notime,''],[notime,''],[notime,''],[notime,'']]
+    high=low=[[notime,''],[notime,''],[notime,''],[notime,'']]
     total=[notime,notime,notime,notime]
 
     for result in results:
@@ -114,14 +112,14 @@ def print_report(results):
         i+=1
 
 def run_tests(parse_args):
-    global results
+    results=[]
 
     test_data=create_test_data(parse_args.size)
     nodes=load_nodefile(parse_args.nodelist) if parse_args.nodelist else ['']
 
     while True:
         for node in nodes:
-            run_test(parse_args,node,test_data)
+            results.append(run_test(parse_args,node,test_data))
 
         if parse_args.nodelist:
             print_report(results)
