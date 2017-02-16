@@ -40,6 +40,9 @@ def create_sw_conn(hostname=""):
     print("Error: Swift environment not configured!")
     sys.exit()
 
+def td_sec(td):
+    return td.total_seconds()
+
 results=[]
 
 def output_results(file,host,create,put,get,delete):
@@ -52,7 +55,8 @@ def output_results(file,host,create,put,get,delete):
         results.append([host,create,put,get,delete])
 
     with open(file,'a') as f:
-        print("%s,%s,%s,%s,%s" % (host,create,put,get,delete),file=f)
+        print("%s,%f,%f,%f,%f" % (host,td_sec(create),td_sec(put),td_sec(get),
+            td_sec(delete)),file=f)
 
 def run_test(parse_args,hostname,test_data):
     start_time=datetime.datetime.now()
@@ -101,18 +105,16 @@ def print_report(results):
 
     i=0
     for item in ['connect','put','get','delete']:
-        print("%s: low %s:%s high %s:%s avg %s" % (item,low[i][0],low[i][1],
-            high[i][0],high[i][1],total[i]/len(results)))
+        print("%s: low %f:%s high %f:%s avg %f" % (item,td_sec(low[i][0]),
+            low[i][1],td_sec(high[i][0]),high[i][1],
+            td_sec(total[i]/len(results))))
         i+=1
 
 def run_tests(parse_args):
     global results
 
     test_data=create_test_data(parse_args.size)
-    if parse_args.nodelist:
-        nodes=load_nodefile(parse_args.nodelist)
-    else:
-        nodes=['']
+    nodes=load_nodefile(parse_args.nodelist) if parse_args.nodelist else ['']
 
     while True:
         for node in nodes:
@@ -137,7 +139,7 @@ def parse_arguments():
     parser.add_argument("-C","--container",help="destination container",
         type=str,required=True)
     parser.add_argument("-f","--file",help="name of output file",
-        type=str,default='swiftperf.out')
+        type=str,default='swiftperf.csv')
     parser.add_argument("-n","--nodelist",help="file with list of swift nodes",
         type=str)
     parser.add_argument("-o","--object",help="name of test object",
