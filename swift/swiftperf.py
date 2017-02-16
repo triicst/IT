@@ -45,7 +45,7 @@ def td_sec(td):
 
 results=[]
 
-def output_results(file,host,create,put,get,delete):
+def output_results(file,host,start,create,put,get,delete):
     global results
 
     if host=='':
@@ -55,8 +55,11 @@ def output_results(file,host,create,put,get,delete):
         results.append([host,create,put,get,delete])
 
     with open(file,'a') as f:
-        print("%s,%f,%f,%f,%f" % (host,td_sec(create),td_sec(put),td_sec(get),
-            td_sec(delete)),file=f)
+        if f.tell()==0:
+           print("epoch,node,create,put,get,delete",file=f)
+
+        print("%s,%s,%f,%f,%f,%f" % (start,host,td_sec(create),td_sec(put),
+            td_sec(get),td_sec(delete)),file=f)
 
 def run_test(parse_args,hostname,test_data):
     start_time=datetime.datetime.now()
@@ -75,7 +78,7 @@ def run_test(parse_args,hostname,test_data):
 
         sc.close()
 
-    output_results(parse_args.file,hostname,
+    output_results(parse_args.file,hostname,start_time,
         create_sw_time-start_time,put_time-create_sw_time,get_time-put_time,
         delete_time-put_time)
 
