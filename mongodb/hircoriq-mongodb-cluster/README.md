@@ -458,7 +458,7 @@ rs0:PRIMARY> rs.status()
         "members" : [
                 {
                         "_id" : 0,
-                        "name" : "dev-db1:27017",
+                        "name" : "test-db1:27017",
                         "health" : 1,
                         "state" : 1,
                         "stateStr" : "PRIMARY",
@@ -475,7 +475,7 @@ rs0:PRIMARY> rs.status()
                 },
                 {
                         "_id" : 1,
-                        "name" : "dev-db2.hicoriq.net:27017",
+                        "name" : "test-db2.hicoriq.net:27017",
                         "health" : 1,
                         "state" : 2,
                         "stateStr" : "SECONDARY",
@@ -498,7 +498,7 @@ rs0:PRIMARY> rs.status()
                 },
                 {
                         "_id" : 2,
-                        "name" : "dev-db3.hicoriq.net:27017",
+                        "name" : "test-db3.hicoriq.net:27017",
                         "health" : 1,
                         "state" : 2,
                         "stateStr" : "SECONDARY",
