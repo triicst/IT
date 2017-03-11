@@ -8,7 +8,7 @@ The MongoDB database files must be encrypted at rest, so you should already have
 /dev/xvdb              /data     xfs    defaults                0 2
 ```
 
-Eash node in the replica cluster should have an XFS formated data volume mounted at /data and configured to mount at boot time before moving on to the next step. 
+Each node in the replica cluster should have an XFS formated data volume mounted at /data and configured to mount at boot time before moving on to the next step. 
 
 
 ## Disable Transparent Hugepages [all nodes] 
@@ -395,7 +395,7 @@ mongo --ssl --host test-db2.hicoriq.net enable-reads-on-db2.js
 
 ### Add DB3 as a secondary:
 
-Execute the following command on DB2:
+Execute the following command on DB3:
 
 ```
 cat > enable-reads-on-db3.js << EOL
