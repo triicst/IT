@@ -14,10 +14,11 @@ maildict['AD'] = ['']
 maildict['BS'] = ['']
 maildict['CR'] = ['']
 maildict['CB'] = [''] # this is Human Biology
+maildict['CP'] = [''] # some new divsion showing up, an error?
 maildict['HD'] = ['petersen']  # this is HDC
 maildict['PH'] = ['phshelpdesk',]
 maildict['VI'] = ['']
-maildict['SR'] = ['']
+maildict['SR'] = ['srs@fredhutch.org',]
 
 mailerrorusers = ['petersen',]
 tmpdir = '/var/tmp'
@@ -54,9 +55,13 @@ def main():
                 continue
 
             div = jsearchone(j,"employeeID",uid,"division")
+            #print('uid:',uid)
+            #print('div:',div)
             if div:
                 uids_add_filt[div].append(uid)
                 uids_add_filt['FH'].append(uid)
+
+                ##### for HDC users #### add them to security group 
 
             n+=1
             
@@ -113,7 +118,7 @@ def mailnewusers(j, uids_add):
             except:
                 e=sys.exc_info()[0]
                 sys.stderr.write("Error in send_mail while sending to '%s': %s\n" % (mailerrorusers[0], e))
-                send_mail(mailerrorusers, "Error - unix-homedirs",
+                send_mail(mailerrorusers, "Error - new users",
                         "Please debug email notification to user '%s', Error: %s\n" % (mailerrorusers[0], e))
 
 def listcompare(oldjsonfile,newlist):

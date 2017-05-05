@@ -6,8 +6,11 @@ Notify Helpdesk if a new Faculty Member / PI is added to Peoplesoft
 
 import sys, os, argparse, json, requests, subprocess
 
-mailusers = ['helpdesk', 'cit-sc',]
+maildomain = '@fredhutch.org'
+storagemailto = ['helpdesk', ]
+slurmmailto = ['scicomp', ]
 mailerrorusers = ['petersen',]
+mailfrom = 'petersen'
 
 tmpdir = '/var/tmp'
 
@@ -32,49 +35,77 @@ def main():
             print('notify on uid:', uid)
             row = jgetonerow(j, "uid", uid)
             pi_dept = jsearchone(j,"uid",uid,"pi_dept")
+
+            ##### mail to setup storage  ################################
             body = """
 a new Faculty / PI has been added to Peoplesoft. Please create a folder 
 "%s" each in Secure, Fast and Economy File.
             """ % pi_dept
-            mailnewpi(row, body)
-                                                                
+            mailnewpi(storagemailto, row, body)
+
+            ##### mail to setup slurm  ################################
+            body = """
+a new Faculty / PI has been added to Peoplesoft. 
+Please create a new slurm account and a folder in /fh/scratch/delete30 for "%s".
+            """ % pi_dept
+            mailnewpi(slurmmailto, row, body)
+
     else:
         print('Error: will not add batches of more than 100 PI')
 
-	## deleting diabled users but never more than 10
+	####################  deleting disabled PI but never never more than 3 ##########
 	#print("\nDeleting %s users...:" % len(uids_del),uids_del)
-	#if len(uids_del) <= 10: 
-		#for uid in uids_del:
-			#print('test: del user %s' % uid)
-			#break
-			#s = 'pveum userdel %s@FHCRC.ORG ' % uid
-			#ret = run_script(s, output=True)
-			#if ret > 0:
-				#print('******** Error : %s' % ret)
-	#else:
-		#print('Error: will not delete more than 1000 users at a time')
+    if len(uids_del) <= 10:
+        for uid in uids_del:
+
+            ##### mail to setup storage  ################################
+            body = """
+a Faculty / PI has been deactivated. Please investigate archiving
+data for "%s" to Economy File 
+            """ % pi_dept
+            mailoldpi(storagemailto, row, body)
+
+            ##### mail to setup slurm  ################################
+            body = """
+a Faculty / PI has been deactivated
+Please remove slurm account for "%s".
+            """ % pi_dept
+            mailoldpi(slurmmailto, row, body)
+
+    else:
+        print('Error: will not process offboarding of more than 3 PI at a time')
 
 	# save the list of currently processed uids 
 
     with open('%s/pi_uids_last.json' % tmpdir, 'w') as outfile:
         json.dump(uids, outfile)
 
-
 ########################################################################
 
 # some helper functions
 
-def mailnewpi(row, body):
-        
+def mailnewpi(mailusers, row, body):
     body = body + '\n\n' + json.dumps(row, sort_keys=True, indent=4)
-    
     try:
-        send_mail(mailusers, "NEW Faculty/PI: Please create storage folders",
-                body)
+        send_mail(mailusers, "NEW Faculty: Please onboard new PI",
+                body, fromaddr=mailfrom+maildomain)
     except:
         e=sys.exc_info()[0]
         sys.stderr.write("Error in send_mail while sending to '%s': %s\n" % (mailerrorusers[0], e))
         send_mail(mailerrorusers, "Error - NEW Faculty/PI",
+                "Please debug email notification to user '%s', Error: %s\n" % (mailerrorusers[0], e))
+
+def mailoldpi(mailusers, row, body):
+        
+    body = body + '\n\n' + json.dumps(row, sort_keys=True, indent=4)
+    
+    try:
+        send_mail(mailusers, "Faculty member deactivated: Please offboard PI",
+                body, fromaddr=mailfrom+maildomain)
+    except:
+        e=sys.exc_info()[0]
+        sys.stderr.write("Error in send_mail while sending to '%s': %s\n" % (mailerrorusers[0], e))
+        send_mail(mailerrorusers, "Error - Faculty/PI offboarding",
                 "Please debug email notification to user '%s', Error: %s\n" % (mailerrorusers[0], e))
 
 def listcompare(oldjsonfile,newlist):
