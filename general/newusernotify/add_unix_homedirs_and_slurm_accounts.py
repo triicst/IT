@@ -15,7 +15,7 @@ mailerrorusers = ['petersen',]
 tmpdir = '/var/tmp'
 
 # job titles that do not require an account. 
-titignore = ["Program Assistant", "Data Coordinator", "Project Coordinator", 
+titignore = ["Program Assistant", "Project Coordinator", 
              "Administrative Assistant", "Administrative Coordinator", 
              "Office Worker", "Data Operations Manager", 
              "Clinical Research Coordinator", "Administrative Manager", 
