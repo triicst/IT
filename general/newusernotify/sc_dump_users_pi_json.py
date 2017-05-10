@@ -1,8 +1,8 @@
 #! /usr/bin/env python3
 
-import sys, os, pymssql, requests, json, collections
+import sys, os, pymssql, requests, csv, json, collections
 
-outfolder = '/var/www/toolbox/json'
+outfolder = '/var/www/toolbox'
 
 with open('/root/sqlcreds', 'r') as f:
     server,database,user,password = f.readline().strip().split(':')
@@ -50,7 +50,7 @@ conn.commit()
 
 cursor = conn.cursor()
 cursor.execute('SELECT * FROM SC_users')
-
+columns = [i[0] for i in cursor.description]
 rows = cursor.fetchall()
 
 objects_list = []
@@ -82,8 +82,14 @@ for row in rows:
  
 j = json.dumps(objects_list, indent=4, default=lambda x:str(x))
 
-with open(outfolder + '/sc_users.json', 'w') as f:
+with open(outfolder + '/json/sc_users.json', 'w') as f:
 	f.write(j)
+
+with open(outfolder + '/csv/sc_users.csv', 'w') as f:
+        mycsv = csv.writer(f, dialect='excel')
+        mycsv.writerow(columns)
+        mycsv.writerows(rows)
+
 
 # *********************** SC_CostCenters_all *****************************
 
@@ -145,7 +151,7 @@ conn.commit()
 
 cursor = conn.cursor()
 cursor.execute('SELECT * FROM SC_users_all')
-
+columns = [i[0] for i in cursor.description]
 rows = cursor.fetchall()
 
 objects_list = []
@@ -177,8 +183,14 @@ for row in rows:
 
 j = json.dumps(objects_list, indent=4, default=lambda x:str(x))
 
-with open(outfolder + '/users_all.json', 'w') as f:
+with open(outfolder + '/json/users_all.json', 'w') as f:
         f.write(j)
+
+with open(outfolder + '/csv/users_all.csv', 'w') as f:
+        mycsv = csv.writer(f, dialect='excel')
+        mycsv.writerow(columns)
+        mycsv.writerows(rows)
+
 
 # ****************************** SC_pi_all ********************************
 cursor = conn.cursor()
@@ -216,7 +228,7 @@ conn.commit()
 
 cursor = conn.cursor()
 cursor.execute('SELECT * FROM SC_pi_all UNION SELECT * FROM SC_pi_extra order by employeeID')
-
+columns = [i[0] for i in cursor.description]
 rows = cursor.fetchall()
 
 objects_list = []
@@ -240,8 +252,13 @@ for row in rows:
 conn.close()
 
 j = json.dumps(objects_list, indent=4, default=lambda x:str(x))
-with open(outfolder + '/pi_all.json', 'w') as f:
+with open(outfolder + '/json/pi_all.json', 'w') as f:
         f.write(j)
+
+with open(outfolder + '/csv/pi_all.csv', 'w') as f:
+        mycsv = csv.writer(f, dialect='excel')
+        mycsv.writerow(columns)
+        mycsv.writerows(rows)
 
 sys.exit()
 
