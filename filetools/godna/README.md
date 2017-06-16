@@ -5,7 +5,7 @@ Godna is a storage benchmarking tool that generates a random DNA sequence and wr
 ## Usage
 
 ```
-./godna [-n <number of files>  -t <cpu threads> -c <concurrecy> -d </dir/path>] -s <size in bytes>
+./godna [-n <number of files>  -t <cpu threads> -c <concurrency> -d </dir/path>] -s <size in bytes>
 ```
 
 ## Arguments

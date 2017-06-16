@@ -21,7 +21,7 @@ func main() {
 	var dFlag = flag.String("d", ".", "Optional: Directory to write the files; defaults to the current directory")
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "\nUsage: %s [-n <number of files>  -t <cpu threads> -c <concurrecy> -d </dir/path>] -s <size in bytes>\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "\nUsage: %s [-n <number of files>  -t <cpu threads> -c <concurrency> -d </dir/path>] -s <size in bytes>\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "\nExample: %s -n 1024 -t 16 -c 32 -s 10485760 -d /tmp\n\n", os.Args[0])
 		flag.PrintDefaults()
 		fmt.Println()
