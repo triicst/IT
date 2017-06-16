@@ -10,6 +10,7 @@ Godna is a storage benchmarking tool that generates a random DNA sequence and wr
 
 ## Arguments
 
+```
   -c int
     	Optional: set number of concurrent file writers to use; defaults to the number of logical CPUs in your system (default 56)
   -d string
@@ -20,6 +21,7 @@ Godna is a storage benchmarking tool that generates a random DNA sequence and wr
     	Required: the size of the file(s) to generate in Bytes
   -t int
     	Optional: set number CPU threads available for use; defaults to the number of logical CPUs in your system (default 56)
+```
 
 ## Example
 
