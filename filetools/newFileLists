@@ -1,0 +1,87 @@
+#! /bin/bash
+
+# create lists of new files for each PI from StorCrawlDB
+
+daysback=3
+outfolder=.
+pghost=mydb
+pgport=32048
+pgdb=storcrawldb
+pguser=storcrawl_ro
+
+scriptname=${0##*/}
+
+if [[ -z $1 ]]; then
+ echo -e "\nusage: $scriptname </root/directory> [outfolder] [days-back]"
+ echo -e "     ->  create lists of new files and look [days-back] from" 
+ echo -e "     ->  StorCrawlDB and store them in [outfolder]."
+ echo -e "     ->  The outfolder default is the current directory and"
+ echo -e "     ->  default for [days-back] is 3 days."
+ echo -e "     ->  example: $scriptname /fh/fast"
+ echo -e "     ->  NOTE: Postgres ~/.pgpass must be configured"
+ exit
+fi
+
+if ! [[ -f ~/.pgpass ]]; then
+  echo -e "  \n  ~/.pgpass does not exist. Please enter credentials separated by colon like this:"
+  echo -e "  ([hostname] should be mydb in most cases)"
+  echo -e "  [hostname]:[port]:[database]:[user]:[password]"
+  read -t 60 -p "  Please paste in the credentials: " pgpassline
+  echo $pgpassline >> ~/.pgpass
+  chmod 600 ~/.pgpass
+fi
+
+if ! [[ -d $1 ]]; then
+ echo -e "Error: data directory $1 does not exist\n"
+ exit
+fi
+source=${1%/}
+
+if ! hash psql 2>/dev/null; then
+ echo -e "Error: psql not found\n"
+ echo -e "Please run first: ml PostgreSQL"
+ exit
+fi
+
+if [[ -n $2 ]]; then
+  outfolder=${2%/}
+fi
+
+if [[ -n $3 ]]; then
+  daysback=$3
+fi
+
+myepoch=$(( $(date '+%s') - ( 24 * 60 * 60 * ${daysback} ) ))
+
+# note: count = -1 means: ignore directories, just use files
+SQLTMPL=$(cat <<EOF
+SELECT
+  filename
+FROM
+  file_metadata
+WHERE
+  owner = 'LASTNAME_F' AND
+  filename LIKE '${source}%' AND
+  count = -1 AND
+  (mtime > ${myepoch} OR
+   ctime > ${myepoch})
+EOF
+)
+
+tmpfile=$(mktemp --tmpdir=/tmp XXXXX.txt)
+
+for dir in $(find ${source} -mindepth 1 -maxdepth 1 -type d); do
+  subdir=${dir%/}
+  plaindir=$(echo $subdir | sed -n 's/.*\/\([^\/]*\)$/\1/p')
+  #echo "subdir:${subdir} plaindir:${plaindir}" outfolder:${outfolder}  
+  SQL=${SQLTMPL//"LASTNAME_F"/"${plaindir}"}
+  psql -w -h ${pghost} -p ${pgport} -d ${pgdb} -U ${pguser} -c "COPY (${SQL}) TO STDOUT WITH CSV" > ${tmpfile}
+  if [[ -s $tmpfile ]]; then
+    sed "s|^${source}/||g" ${tmpfile} | sed "s|^\"${source}/||g" | sed "s|\"$||g" | sed "s|\\\,|,|g" > "${outfolder}/${plaindir}.txt"
+    rm ${tmpfile}
+    echo -e "exported data for ${plaindir}..."
+  fi
+done
+
+echo -e "You can now use rsync with the --files-from feature like this:"
+echo -e "rsync -a --inplace --files-from=\"${outfolder}/${plaindir}.txt\" \"${source}\" \"/your/target/folder\""
