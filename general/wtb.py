@@ -75,12 +75,13 @@ def validate_snmp_str(s):
 
 def parse_proc_load(raw):
    results=re.findall('INTEGER: [0-9]+',raw)
-   load=0
+   free=0
    cpus=0
    for proc in results:
-      load+=int(proc.split(' ')[1])
+      if int(proc.split(' ')[1])<=1:
+         free+=1
       cpus+=1
-   return [int(round((100*cpus-load)/100.)),cpus]
+   return [free,cpus]
 
 def query_nodes(nlist,cstring):
    nodelist=[]
@@ -119,7 +120,7 @@ def valid_cpus(fcpu,ncpu):
       results=str(fcpu)+"/"+str(ncpu)+" cpu"
       if ncpu>1:
          results=results+'s'
-   return '\t'+results+'\t'
+   return '\t'+results+' avail\t'
 
 def multicmp(x,y,key1,key2,key3):
    result=cmp(x[key1],y[key1])
