@@ -138,6 +138,16 @@ def multicmp2(x,y,key1,key2,key3):
       result=cmp(x[key2],y[key2])
    return result
 
+def format_bytes(bytes):
+   if bytes<1000:
+      return str(bytes)+" KB"
+   else:
+      bytes=bytes/1000
+      if bytes<1000:
+         return str(bytes)+" MB"
+      else:
+         return str(bytes/1000)+" GB"
+
 def print_report(results,key1,key2,key3,max_len,summary):
    if key1==2: # sort by cpu
       results.sort(lambda x,y:multicmp2(y,x,key1,key2,key3))
@@ -146,7 +156,7 @@ def print_report(results,key1,key2,key3,max_len,summary):
 
    if summary==None:
       for item in results:
-         print item[0].ljust(max_len)+valid_cpus(item[2],item[3])+str(item[1]/1024)+" MB avail\tload="+item[4]
+         print item[0].ljust(max_len)+valid_cpus(item[2],item[3])+format_bytes(item[1])+" avail\tload="+item[4]
    else:
       for item in results:
          print item[0],
