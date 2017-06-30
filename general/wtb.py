@@ -59,12 +59,16 @@ def build_nodelist(filenames):
 
    return max_len,delete_duplicates(nodelist)
 
+# if list of returns, sum them assuming caller knows they're same type
 def validate_snmp_int(s):
-   parts=s.rsplit("INTEGER:")
-   if len(parts)==2: # strip leading space and extract # from '# kb' case
-      return int(parts[1].strip().split(' ')[0])
-   else:
-      return -1
+   sum=-1
+   parts=s.rsplit("INTEGER: ")
+   if len(parts)>1:
+      for part in parts:
+          if part[0].isdigit():
+             sum+=int(part.split()[0])
+
+   return sum
 
 def validate_snmp_str(s):
    parts=s.rsplit("STRING:")
@@ -88,7 +92,7 @@ def query_nodes(nlist,cstring):
    for node in nlist:
       # grab available free memory
       results=commands.getstatusoutput(snmp_get+cstring+" "+node+
-         " memAvailReal.0")
+         " memAvailReal.0 memBuffer.0 memCached.0")
       if results[0]==0:
          free_mem=validate_snmp_int(results[1])
          if free_mem!=-1:
