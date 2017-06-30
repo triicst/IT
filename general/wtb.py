@@ -120,7 +120,7 @@ def valid_cpus(fcpu,ncpu):
       results=str(fcpu)+"/"+str(ncpu)+" cpu"
       if ncpu>1:
          results=results+'s'
-   return '\t'+results+' avail\t'
+   return '\t'+results+' avail \t'
 
 def multicmp(x,y,key1,key2,key3):
    result=cmp(x[key1],y[key1])
