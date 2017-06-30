@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-WTF - Where's The Beef? - returns list of cluster nodes sorted by free CPU/RAM
+WTB - Where's The Beef? - returns list of cluster nodes sorted by free CPU/RAM
 Jeff Katcher/FHCRC
 
 Interesting MIB variables
@@ -54,7 +54,7 @@ def build_nodelist(filenames):
                   if cur_len>max_len:
                      max_len=cur_len
       except IOError:
-#        print "Warning: cannot open nodefile '"+filename+"'"
+#        print("Warning: cannot open nodefile '"+filename+"'")
          pass
 
    return max_len,delete_duplicates(nodelist)
@@ -105,11 +105,11 @@ def query_nodes(nlist,cstring):
 
                nodelist.append(nodeinfo)
             else:
-               print node+") "+results[1]
+               print(node+") "+results[1])
          else:
-            print node+") "+results[1]
+            print(node+") "+results[1])
       else:
-         print node+") "+results[1]
+         print(node+") "+results[1])
    return nodelist
 
 # format cpu portion of report - SNMP query invalid if ncpu==0
@@ -157,10 +157,10 @@ def print_report(results,key1,key2,key3,max_len,summary):
 
    if summary==None:
       for item in results:
-         print item[0].ljust(max_len)+valid_cpus(item[2],item[3])+format_bytes(item[1])+" avail\tload="+item[4]
+         print(item[0].ljust(max_len)+valid_cpus(item[2],item[3])+format_bytes(item[1])+" avail\tload="+item[4])
    else:
       for item in results:
-         print item[0],
+         print(item[0],)
 
 # main code begins here
 def main(cluster_files=def_cluster_files,cstring=def_cstring):
@@ -189,7 +189,7 @@ def main(cluster_files=def_cluster_files,cstring=def_cstring):
       else:
          print_report(results,2,1,3,max_len,options.summary) # field 2 is cpu
    else:
-      print "Error: no nodes in list!"
+      print("Error: no nodes in list!")
 
 if __name__=="__main__":
    sys.exit(main())
