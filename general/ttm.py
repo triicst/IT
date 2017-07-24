@@ -12,8 +12,7 @@ def get_proclist():
          procname=''
          ppid=''
 
-         status=open(os.path.join('/proc',pid,'status'),'r')
-         for line in status:
+         for line in open(os.path.join('/proc',pid,'status'),'r'):
             if line.startswith('Name:'):
                procname=line.split()[1]
                continue
