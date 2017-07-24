@@ -33,6 +33,7 @@ def get_proclist():
                   uids[uid]=[[pid,procname,ppid]]
                else:
                   uids[uid].append([pid,procname,ppid])
+               break
 
       except IOError: # proc already terminated
          continue
