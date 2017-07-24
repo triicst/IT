@@ -45,10 +45,24 @@ def get_proclist():
 
    return uids
 
+def compress_procnames(pidinfo):
+   procs={}
+
+   for pid in pidinfo:
+      if pid[1] not in procs:
+         procs[pid[1]]=1
+      else:
+         procs[pid[1]]=procs[pid[1]]+1
+
+   for procname,count in procs.items():
+      print(" %s(%d)" % (procname,count),end='')
+   print()
+
 def gen_report(uids):
    for uid,value in uids.items():
       for ppid,pids in value.items():
-          print(pwd.getpwuid(uid).pw_name,ppid,len(pids))
+          print(pwd.getpwuid(uid).pw_name,ppid,len(pids),end='')
+          compress_procnames(pids)
 
 def main(argv):
    uids=get_proclist()
