@@ -6,12 +6,12 @@ import os,sys,pwd
 
 def add_pid(uids,uid,pid_info,ppid):
    if uid not in uids:
-      uids[uid]={ppid:pid_info}
+      uids[uid]={ppid:[pid_info]}
    else:
       if ppid in uids[uid]:
          uids[uid][ppid].append(pid_info)
       else:
-         uids[uid][ppid]=pid_info
+         uids[uid][ppid]=[pid_info]
 
 def get_proclist():
    uids={}
