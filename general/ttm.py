@@ -4,6 +4,15 @@
 
 import os,sys,pwd
 
+def add_pid(uids,uid,pid_info,ppid):
+   if uid not in uids:
+      uids[uid]={ppid:pid_info}
+   else:
+      if ppid in uids[uid]:
+         uids[uid][ppid].append(pid_info)
+      else:
+         uids[uid][ppid]=pid_info
+
 def get_proclist():
    uids={}
 
@@ -28,10 +37,7 @@ def get_proclist():
 
             if line.startswith('Uid:'):
                uid=int(line.split()[1])
-               if uid not in uids:
-                  uids[uid]=[[pid,procname,ppid]]
-               else:
-                  uids[uid].append([pid,procname,ppid])
+               add_pid(uids,uid,[pid,procname],ppid)
                break
 
       except IOError: # proc already terminated
@@ -39,21 +45,9 @@ def get_proclist():
 
    return uids
 
-def gen_ppid_report(pids):
-   ppids={}
-
-   for pid in pids:
-      if pid[2] not in ppids:
-         ppids[pid[2]]=[pid[0],pid[1]]
-      else:
-         ppids[pid[2]].append([pid[0],pid[1]])
-
-   return ppids
-
 def gen_report(uids):
    for uid,value in uids.items():
-      ppids=gen_ppid_report(value)
-      for ppid,pids in ppids.items():
+      for ppid,pids in value.items():
           print(pwd.getpwuid(uid).pw_name,ppid,len(pids))
 
 def main(argv):
