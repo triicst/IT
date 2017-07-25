@@ -114,6 +114,7 @@ def query_nodes(nlist,cstring):
             print(node+") "+results[1])
       else:
          print(node+") "+results[1])
+
    return nodelist
 
 # format cpu portion of report - SNMP query invalid if ncpu==0
@@ -164,7 +165,7 @@ def print_report(results,key1,key2,key3,max_len,summary):
          print(item[0].ljust(max_len)+valid_cpus(item[2],item[3])+format_bytes(item[1])+" avail\tload="+item[4])
    else:
       for item in results:
-         print(item[0],)
+         print item[0],
 
 # main code begins here
 def main(cluster_files=def_cluster_files,cstring=def_cstring):
