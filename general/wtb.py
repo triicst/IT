@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 WTB - Where's The Beef? - returns list of cluster nodes sorted by free CPU/RAM
 Jeff Katcher/FHCRC
@@ -17,7 +17,7 @@ hrProcessorTable
 """
 
 # Template for Cluster Load Utility
-import commands,sys,operator,re,os
+import subprocess,sys,operator,re,os
 from optparse import OptionParser
 
 # Default filename for list of nodes
@@ -54,7 +54,7 @@ def build_nodelist(filenames):
                   if cur_len>max_len:
                      max_len=cur_len
       except IOError:
-#        print("Warning: cannot open nodefile '"+filename+"'")
+#        print("Warning: cannot open nodefile '%s'" % filename)
          pass
 
    return max_len,delete_duplicates(nodelist)
@@ -73,7 +73,7 @@ def validate_snmp_int(s):
 def validate_snmp_str(s):
    parts=s.rsplit("STRING:")
    if len(parts)==2: # strip leading space and extract # from '# kb' case
-      return parts[1].strip().split(' ')[0]
+      return parts[1].rsplit('\\')[0].strip().split(' ')[0]
    else:
       return "(invalid)"
 
@@ -87,33 +87,43 @@ def parse_proc_load(raw):
       cpus+=1
    return [free,cpus]
 
+def run_cmd(cmdline):
+   status=0
+   try: 
+      results=subprocess.check_output(cmdline,shell=True)
+   except subprocess.CalledProcessError:
+      results=""
+      status=-1
+
+   return status,str(results)
+
 def query_nodes(nlist,cstring):
    nodelist=[]
    for node in nlist:
-      # grab available free memory
-      results=commands.getstatusoutput(snmp_get+cstring+" "+node+
+      status,results=run_cmd(snmp_get+cstring+" "+node+
          " memAvailReal.0 memBuffer.0 memCached.0")
-      if results[0]==0:
-         free_mem=validate_snmp_int(results[1])
-         if free_mem!=-1:
-            results=commands.getstatusoutput(snmp_walk+cstring+" "+node+
-               " hrProcessorLoad")
-            if results[0]==0:
-               nodeinfo=[node,free_mem]
-               nodeinfo.extend(parse_proc_load(results[1]))
-             
-               results=commands.getstatusoutput(snmp_get+cstring+" "+node+
-                  " .1.3.6.1.4.1.2021.10.1.3.1")
-               if results[0]==0:
-                  nodeinfo.append(validate_snmp_str(results[1]))
+      if status==-1:
+         continue 
+ 
+      free_mem=validate_snmp_int(results)
+      if free_mem!=-1:
+         status,results=run_cmd(snmp_walk+cstring+" "+node+
+            " hrProcessorLoad")
+         if status==-1:
+            continue
 
-               nodelist.append(nodeinfo)
-            else:
-               print(node+") "+results[1])
-         else:
-            print(node+") "+results[1])
-      else:
-         print(node+") "+results[1])
+         nodeinfo=[node,free_mem]
+         nodeinfo.extend(parse_proc_load(results))
+
+         status,results=run_cmd(snmp_get+cstring+" "+node+
+            " .1.3.6.1.4.1.2021.10.1.3.1")
+         if status==-1:
+            continue
+
+         # process load as float, though returned as string
+         nodeinfo.append(float(validate_snmp_str(results)))
+
+         nodelist.append(nodeinfo)
 
    return nodelist
 
@@ -125,47 +135,31 @@ def valid_cpus(fcpu,ncpu):
       results=str(fcpu)+"/"+str(ncpu)+" cpu"
       if ncpu>1:
          results=results+'s'
-   return '\t'+results+' avail \t'
-
-def multicmp(x,y,key1,key2,key3):
-   result=cmp(x[key1],y[key1])
-   if result==0 and float(y[key3])>0:
-      result=cmp(float(x[key2])/float(x[key3]),float(y[key2])/float(y[key3]))
-   return result
-
-# total kludge to sort by ratio
-def multicmp2(x,y,key1,key2,key3):
-   if float(y[key3])==0 or float(x[key3])==0:
-      result=0
-   else:
-      result=cmp(float(x[key1])/float(x[key3]),float(y[key1])/float(y[key3]))
-
-   if result==0:
-      result=cmp(x[key2],y[key2])
-   return result
+   return '\t'+results+' avail\t'
 
 def format_bytes(bytes):
    if bytes<1000:
-      return str(bytes)+" KB"
+      return "%d KB" % bytes
    else:
       bytes=bytes/1000
       if bytes<1000:
-         return str(bytes)+" MB"
+         return "%.2f MB" % bytes
       else:
-         return str(bytes/1000)+" GB"
+         return "%.2f GB" % (bytes/1000)
 
-def print_report(results,key1,key2,key3,max_len,summary):
-   if key1==2: # sort by cpu
-      results.sort(lambda x,y:multicmp2(y,x,key1,key2,key3))
+def print_report(results,options,max_len):
+   if options.memory==True:
+      results.sort(key=lambda x:x[1],reverse=True)
    else:
-      results.sort(lambda x,y:multicmp(y,x,key1,key2,key3))
+      results.sort(key=lambda x:(x[2]/x[3],x[1]),reverse=True)
 
-   if summary==None:
+   if options.summary==None:
       for item in results:
-         print(item[0].ljust(max_len)+valid_cpus(item[2],item[3])+format_bytes(item[1])+" avail\tload="+item[4])
+         print(item[0].ljust(max_len)+valid_cpus(item[2],item[3])+format_bytes(item[1])+" avail\tload=%.2f" % item[4])
    else:
       for item in results:
-         print item[0],
+         print(item[0]+' ',end='')
+      print()
 
 # main code begins here
 def main(cluster_files=def_cluster_files,cstring=def_cstring):
@@ -189,10 +183,7 @@ def main(cluster_files=def_cluster_files,cstring=def_cstring):
    max_len,nodelist=build_nodelist(cluster_files)
    if len(nodelist)>0:
       results=query_nodes(nodelist,cstring)
-      if options.memory==True:
-         print_report(results,1,2,3,max_len,options.summary) # field 1 is mem
-      else:
-         print_report(results,2,1,3,max_len,options.summary) # field 2 is cpu
+      print_report(results,options,max_len)
    else:
       print("Error: no nodes in list!")
 
