@@ -1,12 +1,12 @@
 # CIFSBAST
 
 
-Application: Cifsblast
-Version: 1.0
-Requires: Unix (Linux, Solaris, Mac) OS, smbclient binary, Python 2.6+
-Purpose: Generate a very high volume of CIFS write IO to stress networks and storage systems.
-Author: Robert McDermott <rmcdermo@fhcrc.org>, Supriatno Agus <sagus@fhcrc.org>
-last updated: 2012-04-03
+- Application: Cifsblast
+- Version: 1.0
+- Requires: Unix (Linux, Solaris, Mac) OS, smbclient binary, Python 2.6+
+- Purpose: Generate a very high volume of CIFS write IO to stress networks and storage systems.
+- Authors: Robert McDermott <rmcdermo@fhcrc.org>, Supriatno Agus <sagus@fhcrc.org>
+- last updated: 2012-04-03
 
 
 ```
