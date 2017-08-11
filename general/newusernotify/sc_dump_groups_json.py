@@ -4,14 +4,6 @@ import sys, os, requests, csv, json, collections, subprocess
 
 outfolder = '/var/www/toolbox'
 
-def uniq(seq):
-    """ remove duplicates from a list """ 
-    # Not order preserving
-    keys = {}
-    for e in seq:
-        keys[e] = 1
-    return list(keys.keys())	
-
 # Only works with Python3.5+
 #ret = subprocess.call('getent group | grep _grp', stdout=subprocess.PIPE, 
 #                   stderr=subprocess.PIPE, shell=True, universal_newlines=True)
