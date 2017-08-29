@@ -130,11 +130,9 @@ def query_nodes(nlist,cstring):
 # format cpu portion of report - SNMP query invalid if ncpu==0
 def valid_cpus(fcpu,ncpu):
    if ncpu==0:
-      results="unavailable"
+      results="can't query"
    else:
-      results=str(fcpu)+"/"+str(ncpu)+" cpu"
-      if ncpu>1:
-         results=results+'s'
+      results="%2d/%2d cpu%s" % (fcpu,ncpu,'s' if ncpu>1 else '')
    return '\t'+results+' avail\t'
 
 def format_bytes(bytes):
