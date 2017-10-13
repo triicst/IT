@@ -63,8 +63,9 @@ def main():
                         "We have removed all your processes from this computer.\n" \
                         "Please try again and submit batch jobs\n" \
                         "or use the 'grabnode' command for interactive jobs.\n\n" \
-                        "see https://teams.fhcrc.org/sites/citwiki/SciComp/Pages/Gizmo%%20Cluster%%20Quickstart.aspx\n" \
-                        "or https://teams.fhcrc.org/sites/citwiki/SciComp/Pages/Grab%%20Commands.aspx\n" \
+                        "see http://scicomp.fhcrc.org/Gizmo%%20Cluster%%20Quickstart.aspx\n" \
+                        "or http://scicomp.fhcrc.org/Grab%%20Commands.aspx\n" \
+                        "or http://scicomp.fhcrc.org/SciComp%20Office%20Hours.aspx\n" \
                         "\n" % (user, hostname, int(percent), maxpercent, maxpercent/100), bcc=[args.bcc,])
                     print ('\nSent util warning to user %s' % user)                    
                     logging.debug('Sent warning email to %s' % user)
@@ -100,8 +101,9 @@ def main():
                         "or %s CPU cores.\n" \
                         "Please reduce your load now and submit batch jobs\n" \
                         "or use the 'grabnode' command for interactive jobs.\n\n" \
-                        "see https://teams.fhcrc.org/sites/citwiki/SciComp/Pages/Gizmo%%20Cluster%%20Quickstart.aspx\n" \
-                        "or https://teams.fhcrc.org/sites/citwiki/SciComp/Pages/Grab%%20Commands.aspx\n" \
+                        "see http://scicomp.fhcrc.org/Gizmo%%20Cluster%%20Quickstart.aspx\n" \
+                        "or http://scicomp.fhcrc.org/Grab%%20Commands.aspx\n" \
+                        "or http://scicomp.fhcrc.org/SciComp%20Office%20Hours.aspx\n" \
                         "\n" % (user, hostname, int(percent), maxpercent, maxpercent/100), bcc=[args.bcc,])
                     os.mknod(stub)                    
                     logging.debug('Sent warning email to %s' % user)  
