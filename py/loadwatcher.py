@@ -9,10 +9,10 @@
 import sys, os, argparse, psutil, time, socket, logging, tempfile, datetime, re
 
 # all processes that use minpercent cpu are aggregated to calculate maxpercent 
-minpercent=45
+minpercent=40
 # send a warning email to users with cpu util > maxpercent
 maxpercent=400
-# kill all processes of a user with cpu util >  killpercent (not yet implemented)
+# kill all processes of a user with cpu util >  killpercent
 killpercent=1600
 
 class KeyboardInterruptError(Exception): pass
@@ -25,16 +25,15 @@ def main():
     if args.debug:
         log_level = logging.DEBUG
     else:
-        log_level = logging.INFO
+        log_level = logging.ERROR
     #logging.basicConfig(file=sys.stdout, format=log_format, level=log_level)
 
     logging.debug('loadwatcher - starting execution at %s' % datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     logging.debug('Parsed arguments: %s' % args)
 
-
     # initialize cpu_percent calculator 
     [(p.pid, p.info['cpu_percent']) for p in psutil.process_iter(attrs=[ 'cpu_percent'])]
-    time.sleep(0.1)
+    time.sleep(1)
 
     userutil={}
     for p in psutil.process_iter(attrs=['name', 'username', 'cpu_percent']):
@@ -44,24 +43,34 @@ def main():
             else:
                 userutil[p.info['username']]=p.info['cpu_percent']
     
-    
     hostname = socket.gethostname()
+    
     for user, percent in userutil.items():
-        print(user, percent)
-        if percent>maxpercent:                    
+        #logging.debug('user:%s, percent:%s' % (user, percent))
+        if args.debug:
+            print ('user:%s, percent:%s' % (user, percent))
+        if percent>killpercent:
             try:
-                if not args.suppress_emails:
-                    send_mail([user,], "%s: You are using too many CPU cores!" % (hostname.upper()),
-                        "Your CPU utilization on %s is currently %s %%!\n\n" \
+                if user != '':
+                    os.spawnlp(os.P_NOWAIT, 'killall', '-9', '-v', '-g', '-u', user)
+                    to=user
+                    if args.onlybcc and args.bcc != '':
+                        to=args.bcc
+                    send_mail([to,], "%s: Your jobs have been removed!" % (hostname.upper()),
+                        "%s, your CPU utilization on %s is currently %s %%!\n\n" \
                         "For short term jobs you can use no more than %s %%\n" \
                         "or %s CPU cores.\n" \
-                        "Please reduce your load now and submit batch jobs\n" \
+                        "We have removed all your processes from this computer.\n" \
+                        "Please try again and submit batch jobs\n" \
                         "or use the 'grabnode' command for interactive jobs.\n\n" \
                         "see https://teams.fhcrc.org/sites/citwiki/SciComp/Pages/Gizmo%%20Cluster%%20Quickstart.aspx\n" \
                         "or https://teams.fhcrc.org/sites/citwiki/SciComp/Pages/Grab%%20Commands.aspx\n" \
-                        "\n" % (hostname, int(percent), maxpercent, maxpercent/100), bcc=[args.bcc,])
-                print ('\nSent util warning to user %s' % user)                    
-                logging.info('Sent warning email to %s' % user)  
+                        "\n" % (user, hostname, int(percent), maxpercent, maxpercent/100), bcc=[args.bcc,])
+                    print ('\nSent util warning to user %s' % user)                    
+                    logging.debug('Sent warning email to %s' % user)
+                else:
+                    print ('Nobody to send emails to')
+                    logging.debug('Nobody to send emails to')
             except:
                 e=sys.exc_info()[0]
                 sys.stderr.write("Error in send_mail while sending to '%s': %s\n" % (user, e))
@@ -70,11 +79,49 @@ def main():
                     send_mail([args.erroremail,], "Error - loadwatcher",
                         "Please debug email notification to user '%s', Error: %s\n" % (user, e))
                 else:
-                    sys.stderr.write('no option --error-email given, cannot send error status via email\n')       
-                    logging.error('no option --error-email given, cannot send error status via email\n')            
-              
-
-
+                    sys.stderr.write('no option --error-email given, cannot send error status via email\n')
+                    logging.error('no option --error-email given, cannot send error status via email\n')         
+            
+            continue
+        
+        stub = os.path.join(tempfile.gettempdir(),os.path.basename(__file__)+'_'+user+'.stub')                                
+        if percent>maxpercent:            
+            if os.path.exists(stub):
+                logging.debug('stub %s already exists' % stub) 
+                return True                
+            try:
+                if user != '':
+                    to=user
+                    if args.onlybcc and args.bcc != '':
+                        to=args.bcc
+                    send_mail([to,], "%s: You are using too many CPU cores!" % (hostname.upper()),
+                        "%s, your CPU utilization on %s is currently %s %%!\n\n" \
+                        "For short term jobs you can use no more than %s %%\n" \
+                        "or %s CPU cores.\n" \
+                        "Please reduce your load now and submit batch jobs\n" \
+                        "or use the 'grabnode' command for interactive jobs.\n\n" \
+                        "see https://teams.fhcrc.org/sites/citwiki/SciComp/Pages/Gizmo%%20Cluster%%20Quickstart.aspx\n" \
+                        "or https://teams.fhcrc.org/sites/citwiki/SciComp/Pages/Grab%%20Commands.aspx\n" \
+                        "\n" % (user, hostname, int(percent), maxpercent, maxpercent/100), bcc=[args.bcc,])
+                    os.mknod(stub)                    
+                    logging.debug('Sent warning email to %s' % user)  
+                else:
+                    logging.debug('Nobody to send emails to')
+            except:
+                e=sys.exc_info()[0]
+                sys.stderr.write("Error in send_mail while sending to '%s': %s\n" % (user, e))
+                logging.error("Error in send_mail while sending to '%s': %s\n" % (user, e))
+                if args.erroremail:
+                    send_mail([args.erroremail,], "Error - loadwatcher",
+                        "Please debug email notification to user '%s', Error: %s\n" % (user, e))
+                else:
+                    sys.stderr.write('no option --error-email given, cannot send error status via email\n')
+                    logging.error('no option --error-email given, cannot send error status via email\n') 
+        else:
+            if os.path.exists(stub):
+                logging.debug('deleting stub %s ...' % stub)
+                os.unlink(stub)
+            
 def send_mail(to, subject, text, attachments=[], cc=[], bcc=[], smtphost="", fromaddr=""):
 
     if sys.version_info[0] == 2:
@@ -186,8 +233,8 @@ def parse_arguments():
     parser.add_argument( '--debug', '-d', dest='debug', action='store_true',
         help='verbose output for all commands',
         default=False )
-    parser.add_argument( '--suppress-emails', '-s', dest='suppress_emails', action='store_true',
-        help='do not send any emails to end users',
+    parser.add_argument( '--only-bcc', '-s', dest='onlybcc', action='store_true',
+        help='do not send any emails to end users, only to the bcc email',
         default=False )
     parser.add_argument( '--bcc', '-c', dest='bcc',
         action='store',
