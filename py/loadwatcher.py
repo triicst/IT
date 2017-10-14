@@ -59,13 +59,13 @@ def main():
                     send_mail([to,], "%s: Your jobs have been removed!" % (hostname.upper()),
                         "%s, your CPU utilization on %s is currently %s %%!\n\n" \
                         "For short term jobs you can use no more than %s %%\n" \
-                        "or %s CPU cores.\n" \
+                        "or %s CPU cores on the Rhino machines.\n" \
                         "We have removed all your processes from this computer.\n" \
                         "Please try again and submit batch jobs\n" \
                         "or use the 'grabnode' command for interactive jobs.\n\n" \
                         "see http://scicomp.fhcrc.org/Gizmo%%20Cluster%%20Quickstart.aspx\n" \
                         "or http://scicomp.fhcrc.org/Grab%%20Commands.aspx\n" \
-                        "or http://scicomp.fhcrc.org/SciComp%20Office%20Hours.aspx\n" \
+                        "or http://scicomp.fhcrc.org/SciComp%%20Office%%20Hours.aspx\n" \
                         "\n" % (user, hostname, int(percent), maxpercent, maxpercent/100), bcc=[args.bcc,])
                     print ('\nSent util warning to user %s' % user)                    
                     logging.debug('Sent warning email to %s' % user)
@@ -98,12 +98,12 @@ def main():
                     send_mail([to,], "%s: You are using too many CPU cores!" % (hostname.upper()),
                         "%s, your CPU utilization on %s is currently %s %%!\n\n" \
                         "For short term jobs you can use no more than %s %%\n" \
-                        "or %s CPU cores.\n" \
+                        "or %s CPU cores on the Rhino machines.\n" \
                         "Please reduce your load now and submit batch jobs\n" \
                         "or use the 'grabnode' command for interactive jobs.\n\n" \
                         "see http://scicomp.fhcrc.org/Gizmo%%20Cluster%%20Quickstart.aspx\n" \
                         "or http://scicomp.fhcrc.org/Grab%%20Commands.aspx\n" \
-                        "or http://scicomp.fhcrc.org/SciComp%20Office%20Hours.aspx\n" \
+                        "or http://scicomp.fhcrc.org/SciComp%%20Office%%20Hours.aspx\n" \
                         "\n" % (user, hostname, int(percent), maxpercent, maxpercent/100), bcc=[args.bcc,])
                     os.mknod(stub)                    
                     logging.debug('Sent warning email to %s' % user)  
