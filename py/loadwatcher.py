@@ -6,7 +6,7 @@
 # loadwatcher dirkpetersen / Oct 2017
 #
 
-import sys, os, argparse, psutil, time, socket, logging, tempfile, datetime, re
+import sys, os, argparse, psutil, time, socket, tempfile, datetime, re
 
 # all processes that use minpercent cpu are aggregated to calculate maxpercent 
 minpercent=40
@@ -21,15 +21,9 @@ def main():
 
     # Set up logging.  Show error messages by default, show debugging 
     # info if specified.
-    log_format = '%(levelname)s:%(module)s:line %(lineno)s:%(message)s'
-    if args.debug:
-        log_level = logging.DEBUG
-    else:
-        log_level = logging.ERROR
-    #logging.basicConfig(file=sys.stdout, format=log_format, level=log_level)
-
-    logging.debug('loadwatcher - starting execution at %s' % datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    logging.debug('Parsed arguments: %s' % args)
+    log = logger('loadwatcher', args.debug)
+    log.debug('loadwatcher - starting execution at %s' % datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    log.debug('Parsed arguments: %s' % args)
 
     # initialize cpu_percent calculator 
     [(p.pid, p.info['cpu_percent']) for p in psutil.process_iter(attrs=[ 'cpu_percent'])]
@@ -46,9 +40,9 @@ def main():
     hostname = socket.gethostname()
     
     for user, percent in userutil.items():
-        #logging.debug('user:%s, percent:%s' % (user, percent))
-        if args.debug:
-            print ('user:%s, percent:%s' % (user, percent))
+        log.debug('user:%s, percent:%s' % (user, percent))
+        #if args.debug:
+        #    print ('user:%s, percent:%s' % (user, percent))
         if percent>killpercent:
             try:
                 if user != '':
@@ -68,28 +62,28 @@ def main():
                         "or http://scicomp.fhcrc.org/SciComp%%20Office%%20Hours.aspx\n" \
                         "\n" % (user, hostname, int(percent), maxpercent, maxpercent/100), bcc=[args.bcc,])
                     print ('\nSent util warning to user %s' % user)                    
-                    logging.debug('Sent warning email to %s' % user)
+                    log.info('Sent warning email to %s' % user)
                 else:
                     print ('Nobody to send emails to')
-                    logging.debug('Nobody to send emails to')
+                    log.warning('Nobody to send emails to')
             except:
                 e=sys.exc_info()[0]
                 sys.stderr.write("Error in send_mail while sending to '%s': %s\n" % (user, e))
-                logging.error("Error in send_mail while sending to '%s': %s\n" % (user, e))
+                log.error("Error in send_mail while sending to '%s': %s\n" % (user, e))
                 if args.erroremail:
                     send_mail([args.erroremail,], "Error - loadwatcher",
                         "Please debug email notification to user '%s', Error: %s\n" % (user, e))
                 else:
                     sys.stderr.write('no option --error-email given, cannot send error status via email\n')
-                    logging.error('no option --error-email given, cannot send error status via email\n')         
+                    log.error('no option --error-email given, cannot send error status via email\n')         
             
             continue
         
         stub = os.path.join(tempfile.gettempdir(),os.path.basename(__file__)+'_'+user+'.stub')                                
         if percent>maxpercent:            
             if os.path.exists(stub):
-                logging.debug('stub %s already exists' % stub) 
-                return True                
+                log.info('stub %s already exists, not sending email' % stub) 
+                continue
             try:
                 if user != '':
                     to=user
@@ -106,22 +100,22 @@ def main():
                         "or http://scicomp.fhcrc.org/SciComp%%20Office%%20Hours.aspx\n" \
                         "\n" % (user, hostname, int(percent), maxpercent, maxpercent/100), bcc=[args.bcc,])
                     os.mknod(stub)                    
-                    logging.debug('Sent warning email to %s' % user)  
+                    log.info('Sent warning email to %s' % user)  
                 else:
-                    logging.debug('Nobody to send emails to')
+                    log.warning('Nobody to send emails to')
             except:
                 e=sys.exc_info()[0]
                 sys.stderr.write("Error in send_mail while sending to '%s': %s\n" % (user, e))
-                logging.error("Error in send_mail while sending to '%s': %s\n" % (user, e))
+                log.error("Error in send_mail while sending to '%s': %s\n" % (user, e))
                 if args.erroremail:
                     send_mail([args.erroremail,], "Error - loadwatcher",
                         "Please debug email notification to user '%s', Error: %s\n" % (user, e))
                 else:
                     sys.stderr.write('no option --error-email given, cannot send error status via email\n')
-                    logging.error('no option --error-email given, cannot send error status via email\n') 
+                    log.error('no option --error-email given, cannot send error status via email\n') 
         else:
             if os.path.exists(stub):
-                logging.debug('deleting stub %s ...' % stub)
+                log.info('deleting stub %s ...' % stub)
                 os.unlink(stub)
             
 def send_mail(to, subject, text, attachments=[], cc=[], bcc=[], smtphost="", fromaddr=""):
@@ -224,6 +218,26 @@ def get_mx_from_email_or_fqdn(addr):
         return ''
     else:
         return mxes[0]
+
+def logger(name=None, stderr=False):
+    import logging, logging.handlers
+    # levels: CRITICAL:50,ERROR:40,WARNING:30,INFO:20,DEBUG:10,NOTSET:0
+    if not name:
+        name=__file__.split('/')[-1:][0]
+    l=logging.getLogger(name)
+    l.setLevel(logging.INFO)
+    f=logging.Formatter('%(name)s: %(levelname)s:%(module)s.%(lineno)d: %(message)s')
+    # logging to syslog
+    s=logging.handlers.SysLogHandler('/dev/log')
+    s.formatter = f
+    l.addHandler(s)
+    if stderr:
+        l.setLevel(logging.DEBUG)
+        # logging to stderr        
+        c=logging.StreamHandler()
+        c.formatter = f
+        l.addHandler(c)
+    return l
 
 def parse_arguments():
     """
