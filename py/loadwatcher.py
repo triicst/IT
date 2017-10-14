@@ -41,12 +41,12 @@ def main():
     
     for user, percent in userutil.items():
         log.debug('user:%s, percent:%s' % (user, percent))
-        #if args.debug:
-        #    print ('user:%s, percent:%s' % (user, percent))
+        # see if we need to kill anything 
         if percent>killpercent:
             try:
                 if user != '':
                     os.spawnlp(os.P_NOWAIT, 'killall', '-9', '-v', '-g', '-u', user)
+                    log.info('executed killall -9 -v -g -u %s' % user)
                     to=user
                     if args.onlybcc and args.bcc != '':
                         to=args.bcc
@@ -60,11 +60,9 @@ def main():
                         "see http://scicomp.fhcrc.org/Gizmo%%20Cluster%%20Quickstart.aspx\n" \
                         "or http://scicomp.fhcrc.org/Grab%%20Commands.aspx\n" \
                         "or http://scicomp.fhcrc.org/SciComp%%20Office%%20Hours.aspx\n" \
-                        "\n" % (user, hostname, int(percent), maxpercent, maxpercent/100), bcc=[args.bcc,])
-                    print ('\nSent util warning to user %s' % user)                    
-                    log.info('Sent warning email to %s' % user)
+                        "\n" % (user, hostname, int(percent), maxpercent, maxpercent/100), bcc=[args.bcc,])                    
+                    log.info('Sent kill notification email to %s' % user)
                 else:
-                    print ('Nobody to send emails to')
                     log.warning('Nobody to send emails to')
             except:
                 e=sys.exc_info()[0]
@@ -79,6 +77,7 @@ def main():
             
             continue
         
+        # see if we need to send a warning 
         stub = os.path.join(tempfile.gettempdir(),os.path.basename(__file__)+'_'+user+'.stub')                                
         if percent>maxpercent:            
             if os.path.exists(stub):
