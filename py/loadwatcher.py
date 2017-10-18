@@ -6,7 +6,7 @@
 # loadwatcher dirkpetersen / Oct 2017
 #
 
-import sys, os, argparse, psutil, time, socket, tempfile, datetime, re
+import sys, os, argparse, psutil, time, socket, tempfile, datetime, re, glob
 
 # all processes that use minpercent cpu are aggregated to calculate maxpercent 
 minpercent=40
@@ -36,7 +36,13 @@ def main():
                 userutil[p.info['username']]+=p.info['cpu_percent']
             else:
                 userutil[p.info['username']]=p.info['cpu_percent']
-    
+                
+    # if user is idle, delete stub /tmp/loadwatcher.py_USER.stub
+    for fl in glob.glob(tempfile.gettempdir()+'/'+os.path.basename(__file__)+'_*.stub'):
+        if not fl[20:-5] in userutil:
+            log.info('deleting stub %s ...' % fl)
+            os.unlink(fl)
+                
     hostname = socket.gethostname()
     
     for user, percent in userutil.items():
@@ -112,10 +118,7 @@ def main():
                 else:
                     sys.stderr.write('no option --error-email given, cannot send error status via email\n')
                     log.error('no option --error-email given, cannot send error status via email\n') 
-        else:
-            if os.path.exists(stub):
-                log.info('deleting stub %s ...' % stub)
-                os.unlink(stub)
+
             
 def send_mail(to, subject, text, attachments=[], cc=[], bcc=[], smtphost="", fromaddr=""):
 
