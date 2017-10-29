@@ -22,11 +22,11 @@ def main():
 
     squeuecmd = ['squeue', '--format=%i;%t;%D;%C;%a;%u']
     sinfocmd = ['sinfo', '--format=%n;%c;%m;%f', '--responding']
-    sacctmgrcmd = ['sacctmgr', 'list', 'qos', 'where', 'name=public', 
+    sacctmgrcmd = ['sacctmgr', 'list', 'qos', 'where', 'name=%s' % args.qos, 
                 'format=maxtresperuser,maxtresperaccount', 
                 '--parsable2', '--noheader']
     
-    sacctmgrupd = "sacctmgr -i update qos where name=public set maxtresperuser=cpu=#UCPU# maxtresperaccount=cpu=#ACPU#"
+    sacctmgrupd = "sacctmgr -i update qos where name=%s set maxtresperuser=cpu=#UCPU# maxtresperaccount=cpu=#ACPU#" % args.qos
     #  sacctmgrcmd returns cpu=xxx|cpu=yyy
 
     headeroffset = 0
@@ -281,45 +281,51 @@ def parse_arguments():
         default='' )   
     parser.add_argument( '--cluster', '-M', dest='cluster',
         action='store',
-        help='name of the slurm cluster',
+        help='name of the slurm cluster, (default: current cluster)',
         default='' )           
     parser.add_argument( '--partition', '-p', dest='partition',
         action='store',
-        help='partition of the slurm cluster',
+        help='partition of the slurm cluster (default: entire cluster)',
         default='' )
     parser.add_argument( '--feature', '-f', dest='feature',
         action='store',
         help='filter for only this slurm feature',
-        default='' )           
+        default='' )     
+    parser.add_argument( '--qos', '-q', dest='qos',
+        action='store',
+        help='slurm QOS to use for changing account limits (default: %(default)s)',
+        default='public' )                
     parser.add_argument( '--maxaccountlimit', '-x', dest='maxlimit',
         action='store',
         type=int,
-        help='upper bound of account limit',
+        help='upper bound of account limit (default: %(default)s)',
         default=300 )             
     parser.add_argument( '--minaccountlimit', '-n', dest='minlimit',
         action='store',
         type=int,
-        help='lower bound of account limit',
+        help='lower bound of account limit (default: %(default)s)',
         default=100 )
     parser.add_argument( '--userlimitoffset', '-o', dest='userlimitoffset',
         action='store',
         type=int,
-        help='offset of userlimit from account limit',
+        help='offset of userlimit from account limit, set a negative ' + \
+             'number for a userlimit lower than account limit (default: %(default)s)',
         default=20 )
     parser.add_argument( '--increasestep', '-s', dest='increasestep',
         action='store',
         type=int,
-        help='step the limit is increased by each run',
+        help='step the limit is increased by each run (default: %(default)s)',
         default=10 )      
     parser.add_argument( '--minpending', '-i', dest='minpending',
         action='store',
         type=int,
-        help='minimum number of jobs that have to be pending',
-        default=100 )      
+        help='minimum number of jobs that have to be pending (default: %(default)s)',
+        default=50 )      
     parser.add_argument( '--maxpercentuse', '-u', dest='maxpercentuse',
         action='store',
         type=int,
-        help='maxmum allowed %% usage in this cluster or partition',
+        help='maxmum allowed %% usage in this cluster or partition ' + \
+             'Throttle QOS down to --minaccountlimit if exceeded. (default: %(default)s)',
         default=85 )
         
     args = parser.parse_args()        
