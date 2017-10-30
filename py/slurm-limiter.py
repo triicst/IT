@@ -20,7 +20,7 @@ def main():
 
     hostname = socket.gethostname()
 
-    squeuecmd = ['squeue', '--format=%i;%t;%D;%C;%a;%u']
+    squeuecmd = ['squeue', '--format=%i;%P;%t;%D;%C;%a;%u']
     sinfocmd = ['sinfo', '--format=%n;%c;%m;%f', '--responding']
     sacctmgrcmd = ['sacctmgr', 'list', 'qos', 'where', 'name=%s' % args.qos, 
                 'format=maxtresperuser,maxtresperaccount', 
@@ -48,17 +48,19 @@ def main():
     acclimit = int(sacctmgr2[1])
     
     jobs=pandas.read_table(squeue.stdout, sep=';', header=headeroffset)
+    if args.partition != '':
+        jobs = jobs[(jobs['PARTITION']==args.partition)]
     nodes=pandas.read_table(sinfo.stdout, sep=';', header=headeroffset)
     if args.feature != '':
         nodes = nodes[(nodes['FEATURES'].str.contains(args.feature))]
-    
-    #if len(jobs.index) > 0:
-    #    print(jobs.groupby(["ACCOUNT","USER"]).sum()["CPUS"])   
     
     # are there any jobs running
     if len(jobs.index) == 0:
         log.debug('No jobs running, really?')
         return True
+        
+    if args.debug:
+        print(jobs.groupby(["PARTITION","ACCOUNT","USER"]).sum()["CPUS"])   
         
     # getting running cores, pending cores, total cores
     jrunning = jobs[jobs['ST'] == 'R'].sum()["CPUS"]
@@ -66,14 +68,14 @@ def main():
     tcores = nodes.sum()["CPUS"] 
     if numpy.isnan(jrunning): jrunning = 0
     if numpy.isnan(jpending): jpending = 0
-    if numpy.isnan(tcores): tocores = 0
+    if numpy.isnan(tcores): tcores = 0
             
     log.info('Cores: running=%i, pending=%i, total=%i, Usage=%i %%, Limits: %i / %i' % 
             (jrunning, jpending, tcores, int(jrunning/tcores*100), acclimit, userlimit))
 
     # are there fewer pending jobs that our minimum threshold?
     if jpending < args.minpending:
-        log.debug('Not enough pending jobs')
+        log.debug('Not adjusting limits, not enough pending jobs')
         return True
     
     # is the percent usage above the max target usage?
@@ -97,7 +99,7 @@ def main():
             acpu = str(args.maxlimit)
         
         log.info('Usage below %i %%, increasing limit to %s / %s ...' % 
-                    (args.maxpercentuse, ucpu, acpu))
+                    (args.maxpercentuse, acpu, ucpu))
                 
     sacctmgrupd = sacctmgrupd.replace('#UCPU#', ucpu)
     sacctmgrupd = sacctmgrupd.replace('#ACPU#', acpu) 
