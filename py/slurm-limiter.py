@@ -81,8 +81,10 @@ def main():
     # is the percent usage above the max target usage?
     if jrunning/tcores*100 > args.maxpercentuse:
         # yes, dial it down please, limit to minimum threshold
-        log.info('Usage above %i %%, throttling ...' % args.maxpercentuse)
-        
+        if acclimit > args.minlimit:
+            log.info('Usage above %i %%, throttling ...' % args.maxpercentuse)
+        else:
+            log.info('account limit already reduced to minimum')        
         # user and account limits as strings so we can replace 
         ucpu=str(args.minlimit+args.userlimitoffset)
         acpu=str(args.minlimit)
@@ -103,48 +105,37 @@ def main():
                 
     sacctmgrupd = sacctmgrupd.replace('#UCPU#', ucpu)
     sacctmgrupd = sacctmgrupd.replace('#ACPU#', acpu) 
-                
-    log.info('executing %s ...' % sacctmgrupd)
-    sacctmgrupdcmd = sacctmgrupd.split(" ")
-    # run sacctmgr to update the QOS limits
-    sacctmgrupd = subprocess.Popen(sacctmgrupdcmd, stdout=subprocess.PIPE)
-    #print(sacctmgrupd.stdout.read())
+    
+    # only execute sacctmgr if there is actually a change 
+    if int(acpu) != acclimit or int(ucpu) != userlimit:
+        log.info('executing %s ...' % sacctmgrupd)
+        sacctmgrupdcmd = sacctmgrupd.split(" ")
+        # run sacctmgr to update the QOS limits
+        sacctmgrupd = subprocess.Popen(sacctmgrupdcmd, stdout=subprocess.PIPE)
+        #print(sacctmgrupd.stdout.read())
 
-
+        try:
+            if args.erroremail:
+                send_mail([args.erroremail,], "Slurm limits changed to account: %s / user: %s" % (acpu,ucpu),
+                    "The SLURM limits were changed !\n\n" \
+                    "Cluster: %s \n" \
+                    "Partition: %s \n" \
+                    "Features: %s \n" \
+                    "Previous Account Limit: %s \n" \
+                    "Previous User Limit: %s \n\n" \
+                    "\n" % (args.cluster, args.partition, args.feature, acclimit, userlimit))
+                    #log.info('Sent warning email to %s' % user)  
+        except:
+            e=sys.exc_info()[0]
+            sys.stderr.write("Error in send_mail while sending to '%s': %s\n" % (args.erroremail, e))
+            log.error("Error in send_mail while sending to '%s': %s\n" % (args.erroremail, e))
+    
     #do we need some file stubs?
     ## if user is idle, delete stub /tmp/loadwatcher.py_USER.stub
     #for fl in glob.glob(tempfile.gettempdir()+'/'+os.path.basename(__file__)+'_*.stub'):
         #if not fl[20:-5] in userutil:
             #log.info('deleting stub %s ...' % fl)
-            #os.unlink(fl)
-
-                
-    # do we need to send emails ?
-    #try:
-        #send_mail([to,], "%s: You are using too many CPU cores!" % (hostname.upper()),
-            #"%s, your CPU utilization on %s is currently %s %%!\n\n" \
-            #"For short term jobs you can use no more than %s %%\n" \
-            #"or %s CPU cores on the Rhino machines.\n" \
-            #"Please reduce your load now and submit batch jobs\n" \
-            #"or use the 'grabnode' command for interactive jobs.\n\n" \
-            #"see http://scicomp.fhcrc.org/Gizmo%%20Cluster%%20Quickstart.aspx\n" \
-            #"or http://scicomp.fhcrc.org/Grab%%20Commands.aspx\n" \
-            #"or http://scicomp.fhcrc.org/SciComp%%20Office%%20Hours.aspx\n" \
-            #"\n" % (user, hostname, int(percent), maxpercent, maxpercent/100), bcc=[args.bcc,])
-        #os.mknod(stub)                    
-        #log.info('Sent warning email to %s' % user)  
-
-    #except:
-        #e=sys.exc_info()[0]
-        #sys.stderr.write("Error in send_mail while sending to '%s': %s\n" % (user, e))
-        #log.error("Error in send_mail while sending to '%s': %s\n" % (user, e))
-        #if args.erroremail:
-            #send_mail([args.erroremail,], "Error - loadwatcher",
-                #"Please debug email notification to user '%s', Error: %s\n" % (user, e))
-        #else:
-            #sys.stderr.write('no option --error-email given, cannot send error status via email\n')
-            #log.error('no option --error-email given, cannot send error status via email\n') 
-
+            #os.unlink(fl)                
             
 def send_mail(to, subject, text, attachments=[], cc=[], bcc=[], smtphost="", fromaddr=""):
 
