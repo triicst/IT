@@ -116,7 +116,7 @@ def main():
 
         try:
             if args.erroremail:
-                send_mail([args.erroremail,], "Slurm limits changed to account: %s / user: %s" % (acpu,ucpu),
+                send_mail([args.erroremail,], "Slurm (acc:%s / user:%s) limits were changed" % (acpu,ucpu),
                     "The SLURM limits were changed !\n\n" \
                     "Cluster: %s \n" \
                     "Partition: %s \n" \
