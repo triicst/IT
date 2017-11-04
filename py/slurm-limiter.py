@@ -308,7 +308,7 @@ def parse_arguments():
         action='store',
         type=int,
         help='step the limit is increased by each run (default: %(default)s)',
-        default=15 )      
+        default=10 )      
     parser.add_argument( '--minpending', '-i', dest='minpending',
         action='store',
         type=int,
@@ -317,7 +317,7 @@ def parse_arguments():
     parser.add_argument( '--maxpercentuse', '-u', dest='maxpercentuse',
         action='store',
         type=int,
-        help='maxmum allowed %% usage in this cluster or partition ' + \
+        help='maximum allowed %% usage in this cluster or partition ' + \
              'Throttle QOS down to --minaccountlimit if exceeded. (default: %(default)s)',
         default=90 )
         
