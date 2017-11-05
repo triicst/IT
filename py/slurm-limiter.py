@@ -21,7 +21,7 @@ def main():
     hostname = socket.gethostname()
 
     squeuecmd = ['squeue', '--format=%i;%P;%t;%D;%C;%a;%u']
-    sinfocmd = ['sinfo', '--format=%n;%c;%m;%f', '--responding']
+    sinfocmd = ['sinfo', '--format=%n;%c;%m;%f;%O;%e;%t', '--responding']
     sacctmgrcmd = ['sacctmgr', 'list', 'qos', 'where', 'name=%s' % args.qos, 
                 'format=maxtresperuser,maxtresperaccount', 
                 '--parsable2', '--noheader']
@@ -44,8 +44,8 @@ def main():
     sacctmgr = subprocess.Popen(sacctmgrcmd, stdout=subprocess.PIPE)
         
     sacctmgr2 = sacctmgr.stdout.read().decode("utf-8").rstrip().replace('cpu=','').split('|')
-    userlimit = int(sacctmgr2[0])
-    acclimit = int(sacctmgr2[1])
+    ulimitold = int(sacctmgr2[0])
+    alimitold = int(sacctmgr2[1])
     
     jobs=pandas.read_table(squeue.stdout, sep=';', header=headeroffset)
     if args.partition != '':
@@ -65,70 +65,91 @@ def main():
     # getting running cores, pending cores, total cores
     jrunning = jobs[jobs['ST'] == 'R'].sum()["CPUS"]
     jpending = jobs[jobs['ST'] == 'PD'].sum()["CPUS"]
-    tcores = nodes.sum()["CPUS"] 
+    tcores = nodes[nodes['STATE'] != 'drain'].sum()["CPUS"]     
+    idlenodes = nodes[nodes['STATE'] == 'idle'].count()['STATE']
+    
     if numpy.isnan(jrunning): jrunning = 0
     if numpy.isnan(jpending): jpending = 0
     if numpy.isnan(tcores): tcores = 0
+    if numpy.isnan(idlenodes): idlenodes = 0
             
-    log.info('Cores: running=%i, pending=%i, total=%i, Usage=%i %%, Limits: %i / %i' % 
-            (jrunning, jpending, tcores, int(jrunning/tcores*100), acclimit, userlimit))
+    log.info('Cores: running=%i, pending=%i, total=%i, Usage=%i %%, Limits: %i / %i, Nodes: idle=%i' % 
+            (jrunning, jpending, tcores, int(jrunning/tcores*100), alimitold, ulimitold, idlenodes))
 
     # are there fewer pending jobs that our minimum threshold?
     if jpending < args.minpending:
         log.debug('Not adjusting limits, not enough pending jobs')
         return True
     
+    # do we not have enough idle nodes ?
+    if idlenodes < args.minidlenodes:
+        log.info('Not enough idle nodes, throttling to minimum limit of %i cores' % args.minlimit)
+        # set the new limits 
+        ulimitnew=args.minlimit+args.userlimitoffset
+        alimitnew=args.minlimit        
+
     # is the percent usage above the max target usage?
-    if jrunning/tcores*100 > args.maxpercentuse:
-        # yes, dial it down please, limit to minimum threshold
-        if acclimit > args.minlimit:
+    elif jrunning/tcores*100 > args.maxpercentuse:
+        # yes, dial it down a little, but only by --changestep
+        alimitnew=alimitold-args.changestep
+        ulimitnew=alimitnew+args.userlimitoffset
+        if alimitnew != alimitold:
             log.info('Usage above %i %%, throttling ...' % args.maxpercentuse)
-        else:
-            log.info('account limit already reduced to minimum')        
-        # user and account limits as strings so we can replace 
-        ucpu=str(args.minlimit+args.userlimitoffset)
-        acpu=str(args.minlimit)
     else:
         # no, let's increase it again. 
-        
-        # user and account limits as strings so we can replace 
-        ucpu=str(userlimit+args.increasestep)
-        acpu=str(acclimit+args.increasestep)
+        alimitnew=alimitold+args.changestep
+        ulimitnew=alimitnew+args.userlimitoffset
         # if the new limit would exceed the max, set the max
-        if userlimit+args.increasestep > args.maxlimit+args.userlimitoffset:
-            ucpu = str(args.maxlimit+args.userlimitoffset)
-        if acclimit > args.maxlimit:
-            acpu = str(args.maxlimit)
-        
-        log.info('Usage below %i %%, increasing limit to %s / %s ...' % 
-                    (args.maxpercentuse, acpu, ucpu))
+        if alimitnew > args.maxlimit:
+            alimitnew = args.maxlimit
+            ulimitnew = alimitnew+args.userlimitoffset
+        if alimitnew != alimitold:
+            log.info('Usage below %i %%, increasing limit to %s / %s ...' % 
+                    (args.maxpercentuse, alimitnew, ulimitnew))
                 
-    sacctmgrupd = sacctmgrupd.replace('#UCPU#', ucpu)
-    sacctmgrupd = sacctmgrupd.replace('#ACPU#', acpu) 
+    sacctmgrupd = sacctmgrupd.replace('#UCPU#', str(ulimitnew))
+    sacctmgrupd = sacctmgrupd.replace('#ACPU#', str(alimitnew)) 
     
     # only execute sacctmgr if there is actually a change 
-    if int(acpu) != acclimit or int(ucpu) != userlimit:
+    if alimitnew != alimitold or ulimitnew != ulimitold:
         log.info('executing %s ...' % sacctmgrupd)
         sacctmgrupdcmd = sacctmgrupd.split(" ")
         # run sacctmgr to update the QOS limits
-        sacctmgrupd = subprocess.Popen(sacctmgrupdcmd, stdout=subprocess.PIPE)
-        #print(sacctmgrupd.stdout.read())
+        ret = subprocess.Popen(sacctmgrupdcmd, stdout=subprocess.PIPE, 
+                               stderr=subprocess.PIPE)
+        stderr = ret.stderr.read().decode("utf-8").rstrip()
+        retcode = ret.wait()
+        if retcode > 0:
+            log.error("Error executing sacctmgr. Error message: %s\n" % (stderr))
 
-        try:
-            if args.erroremail:
-                send_mail([args.erroremail,], "Slurm (account: %s / user: %s) limits were changed" % (acpu,ucpu),
-                    "The SLURM limits were changed !\n\n" \
-                    "Cluster: %s \n" \
-                    "Partition: %s \n" \
-                    "Features: %s \n" \
-                    "Previous Account Limit: %s \n" \
-                    "Previous User Limit: %s \n\n" \
-                    "\n" % (args.cluster, args.partition, args.feature, acclimit, userlimit))
-                    #log.info('Sent warning email to %s' % user)  
-        except:
-            e=sys.exc_info()[0]
-            sys.stderr.write("Error in send_mail while sending to '%s': %s\n" % (args.erroremail, e))
-            log.error("Error in send_mail while sending to '%s': %s\n" % (args.erroremail, e))
+        if alimitnew < args.slalimit:
+            if alimitnew < alimitold:
+                log.warning('SLA breach, reducing account limits below SLA of %i cores' % args.slalimit)
+            # only send mail while SLA is breached 
+            try:
+                if args.erroremail:
+                    send_mail([args.erroremail,], "Slurm (account: %s / user: %s) SLA breach" % (alimitnew,ulimitnew),
+                        "The SLURM limits were changed and we are not meeting the SLA!\n\n" \
+                        "Cluster: %s \n" \
+                        "Partition: %s \n" \
+                        "Features: %s \n" \
+                        "Idle Nodes: %i \n" \
+                        "SLA Account Limit: %i \n" \
+                        "Previous Account Limit: %i \n" \
+                        "Previous User Limit: %i \n" \
+                        "Cores: running=%i, pending=%i, total=%i, Usage=%i %% \n" \
+                        "\n" % (args.cluster, args.partition, args.feature, 
+                        idlenodes, args.slalimit, alimitold, ulimitold, 
+                        jrunning, jpending, tcores, int(jrunning/tcores*100)))
+                    log.debug('Sent warning email to %s' % args.erroremail) 
+                else:
+                    log.error("No email address set via --error-email")
+            except:
+                e=sys.exc_info()[0]
+                sys.stderr.write("Error in send_mail while sending to '%s': %s\n" % (args.erroremail, e))
+                log.error("Error in send_mail while sending to '%s': %s\n" % (args.erroremail, e))
+    else:
+        log.debug('no account limit changes required')
     
     #do we need some file stubs?
     ## if user is idle, delete stub /tmp/loadwatcher.py_USER.stub
@@ -287,39 +308,51 @@ def parse_arguments():
     parser.add_argument( '--qos', '-q', dest='qos',
         action='store',
         help='slurm QOS to use for changing account limits (default: %(default)s)',
-        default='public' )                
+        default='public' )                          
     parser.add_argument( '--maxaccountlimit', '-x', dest='maxlimit',
         action='store',
         type=int,
-        help='upper bound of account limit (default: %(default)s)',
+        help='maximum account limit, never go above this (default: %(default)s)',
         default=300 )             
     parser.add_argument( '--minaccountlimit', '-n', dest='minlimit',
         action='store',
         type=int,
-        help='lower bound of account limit (default: %(default)s)',
+        help='minimum account limit, never go below this (default: %(default)s)',
         default=100 )
+    parser.add_argument( '--slaaccountlimit', '-t', dest='slalimit',
+        action='store',
+        type=int,
+        help='min SLA limit that has been committed to customers, ' + \
+             'notify via email if breached (default: %(default)s)',
+        default=150 )
     parser.add_argument( '--userlimitoffset', '-o', dest='userlimitoffset',
         action='store',
         type=int,
         help='offset of userlimit from account limit, set a negative ' + \
              'number for a userlimit lower than account limit (default: %(default)s)',
         default=20 )
-    parser.add_argument( '--increasestep', '-s', dest='increasestep',
+    parser.add_argument( '--changestep', '-s', dest='changestep',
         action='store',
         type=int,
-        help='step the limit is increased by each run (default: %(default)s)',
-        default=10 )      
+        help='increase or decrease the limit by this # of cores (default: %(default)s)',
+        default=10 )
     parser.add_argument( '--minpending', '-i', dest='minpending',
         action='store',
         type=int,
-        help='minimum number of jobs that have to be pending (default: %(default)s)',
+        help='minimum number of jobs that have to be pending to take action (default: %(default)s)',
         default=50 )      
     parser.add_argument( '--maxpercentuse', '-u', dest='maxpercentuse',
         action='store',
         type=int,
         help='maximum allowed %% usage in this cluster or partition ' + \
-             'Throttle QOS down to --minaccountlimit if exceeded. (default: %(default)s)',
+             'Throttle QOS down by --changestep if exceeded. (default: %(default)s)',
         default=90 )
+    parser.add_argument( '--minidlenodes', '-w', dest='minidlenodes', 
+        action='store',
+        type=int,
+        help='critical minimum number of idle nodes. Throttle QOS down ' + \
+             'to --minaccountlimit if exceeded. (default: %(default)s)',
+        default=5 )   
         
     args = parser.parse_args()        
     if args.debug:
