@@ -141,7 +141,7 @@ def main():
                         "Cluster: %s \n" \
                         "Partition: %s \n" \
                         "Features: %s \n" \
-                        "Idle Nodes: %i \n" \
+                        "Idle Nodes (incl. restart): %i \n" \
                         "SLA Account Limit: %i \n" \
                         "Previous Account Limit: %i \n" \
                         "Previous User Limit: %i \n" \
