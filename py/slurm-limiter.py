@@ -82,19 +82,27 @@ def main():
         return True
     
     # do we not have enough idle nodes ?
-    if idlenodes < args.minidlenodes:
-        log.info('Not enough idle nodes, throttling to minimum limit of %i cores' % args.minlimit)
-        # set the new limits 
+    # This does not work because of the restart queue
+    #if idlenodes < args.minidlenodes:
+    #    log.info('Not enough idle nodes, throttling to minimum limit of %i cores' % args.minlimit)
+    #    # set the new limits 
+    #    ulimitnew=args.minlimit+args.userlimitoffset
+    #    alimitnew=args.minlimit        
+    
+    # is the percent usage above the max target usage plus 5%?
+    if jrunning/tcores*100 > args.maxpercentuse+5:
+        log.info('Utilization 5% above max, throttling to minimum limit of %i cores' % args.minlimit)
         ulimitnew=args.minlimit+args.userlimitoffset
         alimitnew=args.minlimit        
-
+        
     # is the percent usage above the max target usage?
     elif jrunning/tcores*100 > args.maxpercentuse:
         # yes, dial it down a little, but only by --changestep
         alimitnew=alimitold-args.changestep
         ulimitnew=alimitnew+args.userlimitoffset
         if alimitnew != alimitold:
-            log.info('Usage above %i %%, throttling ...' % args.maxpercentuse)
+            log.info('Usage above %i %%, throttling by %i %%...' % 
+                     (args.maxpercentuse, args.changestep))
     else:
         # no, let's increase it again. 
         alimitnew=alimitold+args.changestep
