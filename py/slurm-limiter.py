@@ -139,8 +139,8 @@ def main():
             # only send mail while SLA is breached 
             try:
                 if args.erroremail:
-                    send_mail([args.erroremail,], "Slurm (account: %s / user: %s) SLA breach" % (alimitnew,ulimitnew),
-                        "The SLURM limits were changed and we are not meeting the SLA!\n\n" \
+                    send_mail([args.erroremail,], "Slurm (account: %s / user: %s) SLA breach. Limits changed!" % (alimitnew,ulimitnew),
+                        "The SLURM limits were changed. We are not meeting the SLA Account Limit!\n\n" \
                         "Cluster: %s \n" \
                         "Partition: %s \n" \
                         "Features: %s \n" \
