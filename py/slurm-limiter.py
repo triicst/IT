@@ -91,7 +91,7 @@ def main():
     
     # is the percent usage above the max target usage plus 5%?
     if jrunning/tcores*100 > args.maxpercentuse+5:
-        log.info('Utilization 5% above max, throttling to minimum limit of %i cores' % args.minlimit)
+        log.info('Utilization > 5%% above max, throttling to minimum limit of %i cores' % args.minlimit)
         ulimitnew=args.minlimit+args.userlimitoffset
         alimitnew=args.minlimit        
         
