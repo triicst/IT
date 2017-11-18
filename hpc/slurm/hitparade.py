@@ -13,6 +13,7 @@ import cmath
 import pwd
 
 ignorenodetypes = ['gizmoc', 'gizmod']
+maxpendingcores = 3999
 
 def main():
     """
@@ -160,6 +161,8 @@ def print_csv(csv_header_suppress, nodetags, pendingcores):
 
     if pendingcores.has_key('campus'):
         cores_pending = pendingcores['campus']
+        if cores_pending > maxpendingcores:
+            cores_pending = maxpendingcores
             
     csv.writer(sys.stdout).writerow([label, cores_total, cores_pending, cores_idle,
                 cores_used_restart, cores_used_priority, unix_load])
@@ -168,6 +171,9 @@ def print_csv(csv_header_suppress, nodetags, pendingcores):
     cores_total, cores_pending, cores_idle, cores_used_restart, cores_used_priority, unix_load = [0, 0, 0, 0, 0, 0]
     for k, v in pendingcores.iteritems():
         cores_pending+=v
+    if cores_pending > maxpendingcores:
+        cores_pending = maxpendingcores
+
 
     label = 'all - entire cluster'
     for key, value in sorted(nodetags.iteritems()):
@@ -184,9 +190,13 @@ def print_csv(csv_header_suppress, nodetags, pendingcores):
 
     # 'full - public nodes'
     cores_total, cores_pending, cores_idle, cores_used_restart, cores_used_priority, unix_load = [0, 0, 0, 0, 0, 0]
-    label = 'gizmog - subset of campus'
+    #label = 'largenode - GizmoG'
+    label = 'full - public nodes'
     if pendingcores.has_key('full'):
         cores_pending=pendingcores['full']
+        if cores_pending > maxpendingcores:
+            cores_pending = maxpendingcores
+
     
     for key, value in sorted(nodetags.iteritems()):
         if key.endswith(',gizmog'):
@@ -202,9 +212,9 @@ def print_csv(csv_header_suppress, nodetags, pendingcores):
 
     # 'grabnode - public nodes'
     cores_total, cores_pending, cores_idle, cores_used_restart, cores_used_priority, unix_load = [0, 0, 0, 0, 0, 0]
-    label = 'grabnode - discontinued'
+    label = 'grabnode - public nodes'
     for key, value in sorted(nodetags.iteritems()):
-        if key.startswith('grabnode,'):         
+        if key.startswith('grab,'):         
             cores_total+=value[0]-value[2]
             cores_idle+=value[3]
             cores_used_restart+=value[5]
@@ -220,7 +230,8 @@ def print_csv(csv_header_suppress, nodetags, pendingcores):
     
     for key, value in sorted(nodetags.iteritems()):
         if key.endswith(',gizmoh'):
-            label = 'largenode - gizmoh'
+            #label = 'largenode - GizmoH'
+            label = 'largenode - public cores'
             cores_total+=value[0]-value[2]
             cores_idle+=value[3]
             cores_used_restart+=value[5]
