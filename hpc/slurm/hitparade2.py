@@ -49,7 +49,7 @@ def main():
 
     else:
 
-        print("No Nodes and/or no Jobs found !")
+        print "No Nodes and/or no Jobs found !"
 
     sys.exit()
 
@@ -68,17 +68,17 @@ def main():
 
 def print_usage(ajobs):
     for k,v in sorted(ajobs.items()):
-        print(("\n === Queue: %s ======= (R / PD) %s" % (k, "="*(12-len(k)))))
+        print("\n === Queue: %s ======= (R / PD) %s" % (k, "="*(12-len(k))))
         tr=0
         tp=0
         #print('v:', v)
-        for kk,vv in sorted( list(v.items()), key=lambda x: x[1], reverse=True):
+        for kk,vv in sorted( v.items(), key=lambda x: x[1], reverse=True):
             #print('vv:', vv)
             tr+=vv[0]
             tp+=vv[1]
-            print(("{:>25} {:<5}".format( kk, "%s / %s" % (vv[0], vv[1]))))
+            print ("{:>25} {:<5}".format( kk, "%s / %s" % (vv[0], vv[1])))
         if len(v)>1:
-            print(("{:>25} {:<5}".format( "TOTAL:", "%s / %s" % (tr, tp))))
+            print ("{:>25} {:<5}".format( "TOTAL:", "%s / %s" % (tr, tp)))
         
 
 def get_aggregated_jobs(job_dict, arguments):
@@ -86,16 +86,16 @@ def get_aggregated_jobs(job_dict, arguments):
 
     ajobs={}
 
-    for key, value in list(job_dict.items()):
+    for key, value in job_dict.items():
         luser=pwd.getpwuid(value['user_id'])
 
         if arguments.pi:
             mykey = "%s" % value['account']
         else:
             mykey = "%s (%s)" % (value['account'], luser[0])
-        if value['partition'] in ajobs:
+        if ajobs.has_key(value['partition']):
             udict = ajobs[value['partition']]
-            if mykey in udict:
+            if udict.has_key(mykey):
                 ulist = udict[mykey]
             else:
                 ulist = [0, 0]
@@ -151,7 +151,7 @@ def print_csv(csv_header_suppress, nodetags, pendingcores):
     # 'campus - public cores'
     cores_total, cores_pending, cores_idle, cores_used_restart, cores_used_priority, unix_load = [0, 0, 0, 0, 0, 0]
     label = 'campus - public cores'
-    for key, value in sorted(nodetags.items()):
+    for key, value in sorted(nodetags.iteritems()):
         if key.startswith('campus'):
             cores_total+=value[0]-value[2]
             cores_idle+=value[3]
@@ -159,7 +159,7 @@ def print_csv(csv_header_suppress, nodetags, pendingcores):
             cores_used_priority+=value[1]-value[5]
             unix_load+=value[4]/100
 
-    if 'campus' in pendingcores:
+    if pendingcores.has_key('campus'):
         cores_pending = pendingcores['campus']
         if cores_pending > maxpendingcores:
             cores_pending = maxpendingcores
@@ -169,14 +169,14 @@ def print_csv(csv_header_suppress, nodetags, pendingcores):
 
     # 'all - entire cluster'
     cores_total, cores_pending, cores_idle, cores_used_restart, cores_used_priority, unix_load = [0, 0, 0, 0, 0, 0]
-    for k, v in pendingcores.items():
+    for k, v in pendingcores.iteritems():
         cores_pending+=v
     if cores_pending > maxpendingcores:
         cores_pending = maxpendingcores
 
 
     label = 'all - entire cluster'
-    for key, value in sorted(nodetags.items()):
+    for key, value in sorted(nodetags.iteritems()):
         if key.startswith('Total'):
             cores_total+=value[0]-value[2]
             cores_idle+=value[3]
@@ -192,13 +192,13 @@ def print_csv(csv_header_suppress, nodetags, pendingcores):
     cores_total, cores_pending, cores_idle, cores_used_restart, cores_used_priority, unix_load = [0, 0, 0, 0, 0, 0]
     #label = 'largenode - GizmoG'
     label = 'full - public nodes'
-    if 'full' in pendingcores:
+    if pendingcores.has_key('full'):
         cores_pending=pendingcores['full']
         if cores_pending > maxpendingcores:
             cores_pending = maxpendingcores
 
     
-    for key, value in sorted(nodetags.items()):
+    for key, value in sorted(nodetags.iteritems()):
         if key.endswith(',gizmog'):
             cores_total+=value[0]-value[2]
             cores_idle+=value[3]
@@ -213,7 +213,7 @@ def print_csv(csv_header_suppress, nodetags, pendingcores):
     # 'grabnode - public nodes'
     cores_total, cores_pending, cores_idle, cores_used_restart, cores_used_priority, unix_load = [0, 0, 0, 0, 0, 0]
     label = 'grabnode - public nodes'
-    for key, value in sorted(nodetags.items()):
+    for key, value in sorted(nodetags.iteritems()):
         if key.startswith('grab,'):         
             cores_total+=value[0]-value[2]
             cores_idle+=value[3]
@@ -228,7 +228,7 @@ def print_csv(csv_header_suppress, nodetags, pendingcores):
     # 'largenode - public cores'
     cores_total, cores_pending, cores_idle, cores_used_restart, cores_used_priority, unix_load = [0, 0, 0, 0, 0, 0]
     
-    for key, value in sorted(nodetags.items()):
+    for key, value in sorted(nodetags.iteritems()):
         if key.endswith(',gizmoh'):
             #label = 'largenode - GizmoH'
             label = 'largenode - public cores'
@@ -246,7 +246,7 @@ def print_csv(csv_header_suppress, nodetags, pendingcores):
     cores_total, cores_pending, cores_idle, cores_used_restart, cores_used_priority, unix_load = [0, 0, 0, 0, 0, 0]
 
     label = 'private nodes'
-    for key, value in sorted(nodetags.items()):
+    for key, value in sorted(nodetags.iteritems()):
         if not key.startswith('largenode,') and not key.startswith('campus,') and \
             not key.startswith('full,') and not key.startswith('grabnode,') and \
             not key.startswith('Total'):
@@ -268,10 +268,10 @@ def get_pending(job_dict):
 
     pendingcores={}
 
-    for key1, value1 in job_dict.items():
+    for key1, value1 in job_dict.iteritems():
         if value1['job_state'] == 'PENDING':  # is the job pending
             pcores = int(value1['num_cpus'])
-            if value1['partition'] in pendingcores:
+            if pendingcores.has_key(value1['partition']):
                 pcores += pendingcores[value1['partition']]
             pendingcores[value1['partition']] = pcores
 
@@ -290,7 +290,7 @@ def get_nodetag(node_dict, job_dict, arguments):
         restartcores={}
         extrarestartcores=0 # multi node restart jobs cannot be easily assigned to a tag 
 
-        for key1, value1 in job_dict.items():
+        for key1, value1 in job_dict.iteritems():
 
             if value1['job_state'] == 'RUNNING':  # is the job running
                 if value1['partition'] == 'restart':
@@ -301,11 +301,11 @@ def get_nodetag(node_dict, job_dict, arguments):
                     else:
                         node = value1['nodes']
                         rcores=0
-                        if node in restartcores:
+                        if restartcores.has_key(node):
                             rcores=restartcores[node]
                         restartcores[node]=rcores+int(value1['num_cpus'])
 
-        for key, value in node_dict.items():
+        for key, value in node_dict.iteritems():
 
             cont=0
             for typ in ignorenodetypes:
@@ -321,7 +321,7 @@ def get_nodetag(node_dict, job_dict, arguments):
             cpuidle = cpuinst-cpualloc
             cpuload = value['cpu_load']
             cpurestart = 0
-            if value['name'] in restartcores:
+            if restartcores.has_key(value['name']):
                 cpurestart = restartcores[value['name']]
             features = value['features']+','+value['name'][:6]
             ##print('state',value['state'][0])
@@ -335,10 +335,10 @@ def get_nodetag(node_dict, job_dict, arguments):
 
 
             if arguments.debug:
-                print((value['name'],features,cpuinst,cpualloc,cpuidle,cpuload,cpurestart,value['state']))
+                print(value['name'],features,cpuinst,cpualloc,cpuidle,cpuload,cpurestart,value['state'])
             #sys.exit()
 
-            if features in nodetag:
+            if nodetag.has_key(features):
                 nclass = nodetag[features]
                 #print(features, nclass)
                 nodetag[features]=[nclass[0]+cpuinst,nclass[1]+cpualloc,nclass[2]+cpuoffline,
