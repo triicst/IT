@@ -31,7 +31,7 @@ def main():
 
     headeroffset = 0
     if args.cluster != '':
-        headeroffset = 1
+        headeroffset = 1lurm_nodes
         squeuecmd.append('--cluster=%s' % args.cluster)
         sinfocmd.append('--cluster=%s' % args.cluster)
 
