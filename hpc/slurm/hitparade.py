@@ -28,12 +28,17 @@ def main():
         logging.basicConfig(level=logging.WARNING)
 
     # replacing pyslurm with functions calling squeue and sinfo
-    node_dict = slurm_nodes(args)
-    job_dict = slurm_jobs(args)
+    nodes = slurm_nodes(args)
+    node_dict = nodes.to_dict(orient='index')
+    
+    jobs = slurm_jobs(args)
+    job_dict = jobs.to_dict(orient='index')
     
     if len(node_dict) > 0 and len(job_dict) > 0:
 
-        nt = get_nodetag(node_dict, job_dict, args)
+        nt = get_nodetag(node_dict, job_dict, args)        
+        #body = json.dumps(nt, sort_keys=True, indent=4)
+        #print(body)
         pc = get_pending(job_dict)
 
         if args.csv:
@@ -45,22 +50,7 @@ def main():
 
         print("No Nodes and/or no Jobs found !")
 
-    sys.exit()
-
-
-    node_reservations = get_node_reservations()
-    jobs = get_jobs(all_jobs=args.all_jobs)
-    cred_totals, public_cores, public_nodes, public_nodes_free = get_counts(node_reservations, jobs)
-
-    if args.free_cores:
-        print_free_cores(cred_totals, public_cores)
-    elif args.csv:
-        print_csv(args.csv_header_suppress, cred_totals, public_cores, public_nodes, public_nodes_free)
-    else:
-        print_output(cred_totals, public_cores, public_nodes, public_nodes_free) 
         
-        
-
 def slurm_jobs(args):
     
     squeuecmd = ['squeue', '--format=%i;%j;%P;%t;%D;%C;%a;%u;%N']
@@ -69,19 +59,23 @@ def slurm_jobs(args):
     if args.cluster != '':
         headeroffset = 1
         squeuecmd.append('--cluster=%s' % args.cluster)
-        
+
+    if args.partition != '':
+        squeuecmd.append('--partition=%s' % args.partition)
+                
     squeue = subprocess.Popen(squeuecmd, stdout=subprocess.PIPE)
     
     jobs=pandas.read_table(squeue.stdout, sep=';', header=headeroffset)
+    if args.partition != '':
+        jobs = jobs[(jobs['PARTITION']==args.partition)] 
 
     # are there any jobs running
     if len(jobs.index) == 0:
         return {}
         
     jobs.set_index(['JOBID',], inplace=True)
-    djobs = jobs.to_dict(orient='index')
-        
-    return djobs
+    
+    return jobs
     
 def slurm_nodes(args):
     
@@ -91,17 +85,19 @@ def slurm_nodes(args):
     if args.cluster != '':
         headeroffset = 1
         sinfocmd.append('--cluster=%s' % args.cluster)
+    
+    if args.partition != '':
+        sinfocmd.append('--partition=%s' % args.partition)        
         
     sinfo = subprocess.Popen(sinfocmd, stdout=subprocess.PIPE)
             
     nodes=pandas.read_table(sinfo.stdout, sep=';', header=headeroffset)
     nodes.set_index(['HOSTNAMES',], inplace=True)
-    dnodes = nodes.to_dict(orient='index')
-            
-    return dnodes
+                
+    return nodes
 
 def print_usage(ajobs):
-    for k,v in sorted(ajobs.items()):
+    for k,v in ajobs.items():
         print(("\n === Queue: %s ======= (R / PD) %s" % (k, "="*(12-len(k)))))
         tr=0
         tp=0
@@ -160,7 +156,9 @@ def get_aggregated_jobs(job_dict, args):
 ##            print('num_cpus: %s' % value['num_cpus'])
 ##            print('-') * 40
         
-        
+    #body = json.dumps(ajobs, sort_keys=True, indent=4)
+    #print(body)
+            
     return ajobs
 
 def print_csv(csv_header_suppress, nodetags, pendingcores):
@@ -186,12 +184,12 @@ def print_csv(csv_header_suppress, nodetags, pendingcores):
     cores_total, cores_pending, cores_idle, cores_used_restart, cores_used_priority, unix_load = [0, 0, 0, 0, 0, 0]
     label = 'campus - public cores'
     for key, value in sorted(nodetags.items()):
-        if key.startswith('campus'):
+        if 'campus' in key and 'gizmof' in key:
             cores_total+=value[0]-value[2]
             cores_idle+=value[3]
             cores_used_restart+=value[5]
             cores_used_priority+=value[1]-value[5]
-            unix_load+=value[4]/100
+            unix_load+=int(value[4])
 
     if 'campus' in pendingcores:
         cores_pending = pendingcores['campus']
@@ -216,11 +214,10 @@ def print_csv(csv_header_suppress, nodetags, pendingcores):
             cores_idle+=value[3]
             cores_used_restart+=value[5]
             cores_used_priority+=value[1]-value[5]
-            unix_load+=value[4]/100
+            unix_load+=int(value[4])
 
     csv.writer(sys.stdout).writerow([label, cores_total, cores_pending, cores_idle,
                 cores_used_restart, cores_used_priority, unix_load])
-
 
     # 'full - public nodes'
     cores_total, cores_pending, cores_idle, cores_used_restart, cores_used_priority, unix_load = [0, 0, 0, 0, 0, 0]
@@ -238,7 +235,7 @@ def print_csv(csv_header_suppress, nodetags, pendingcores):
             cores_idle+=value[3]
             cores_used_restart+=value[5]
             cores_used_priority+=value[1]-value[5]
-            unix_load+=value[4]/100
+            unix_load+=int(value[4])
 
     csv.writer(sys.stdout).writerow([label, cores_total, cores_pending, cores_idle,
                 cores_used_restart, cores_used_priority, unix_load])
@@ -253,7 +250,7 @@ def print_csv(csv_header_suppress, nodetags, pendingcores):
             cores_idle+=value[3]
             cores_used_restart+=value[5]
             cores_used_priority+=value[1]-value[5]
-            unix_load+=value[4]/100
+            unix_load+=int(value[4])
 
     csv.writer(sys.stdout).writerow([label, cores_total, cores_pending, cores_idle,
                 cores_used_restart, cores_used_priority, unix_load])
@@ -270,7 +267,7 @@ def print_csv(csv_header_suppress, nodetags, pendingcores):
             cores_idle+=value[3]
             cores_used_restart+=value[5]
             cores_used_priority+=value[1]-value[5]
-            unix_load+=value[4]/100
+            unix_load+=int(value[4])
 
     csv.writer(sys.stdout).writerow([label, cores_total, cores_pending, cores_idle,
                 cores_used_restart, cores_used_priority, unix_load])
@@ -288,7 +285,7 @@ def print_csv(csv_header_suppress, nodetags, pendingcores):
             cores_idle+=value[3]
             cores_used_restart+=value[5]
             cores_used_priority+=value[1]-value[5]
-            unix_load+=value[4]/100
+            unix_load+=int(value[4])
 
     csv.writer(sys.stdout).writerow([label, cores_total, cores_pending, cores_idle,
                 cores_used_restart, cores_used_priority, unix_load])
@@ -358,6 +355,8 @@ def get_nodetag(node_dict, job_dict, args):
             if key in restartcores:
                 cpurestart = restartcores[key]
             features = value['FEATURES']+','+key[:6]
+            #print('feaures:', features, value['FEATURES'])
+            
             ##print('state',value['state'][0])
 
             if cpuload > 1000:   # down or drained node
@@ -370,11 +369,18 @@ def get_nodetag(node_dict, job_dict, args):
 
             if args.debug:
                 print((key,features,cpuinst,cpualloc,cpuidle,cpuload,cpurestart,value['STATE']))
-            #sys.exit()
+                
+            #print (nodetag)
+            
+            
 
             if features in nodetag:
                 nclass = nodetag[features]
-                #print(features, nclass)
+                #print('features' ,'nodetag')
+                #print(features, nodetag)
+                #print('end features' ,'end nodetag')
+                
+                
                 nodetag[features]=[nclass[0]+cpuinst,nclass[1]+cpualloc,nclass[2]+cpuoffline,
                     nclass[3]+cpuidle,nclass[4]+cpuload,nclass[5]+cpurestart]
             else:
@@ -390,6 +396,8 @@ def get_nodetag(node_dict, job_dict, args):
         total[5]+=extrarestartcores   # adding cores from multi-node restart jobs
         nodetag["Total"]=total  #
         #print(nodetag)
+        #body = json.dumps(nodetag, sort_keys=True, indent=4)
+        #print(body)
         return nodetag
 
 def parse_arguments():
@@ -409,6 +417,10 @@ def parse_arguments():
         action='store',
         help='name of the slurm cluster, (default: current cluster)',
         default='' )              
+    parser.add_argument( '--partition', '-p', dest='partition',
+        action='store',
+        help='partition of the slurm cluster (default: entire cluster)',
+        default='' )
     parser.add_argument( '--csv', '-c', dest='csv', action='store_true', 
         help='Output core and node totals to csv.',
         default=False )
@@ -416,7 +428,7 @@ def parse_arguments():
         action='store_true', 
         help='Used with --csv, suppresses header. Default is False, show header.',
         default=False )
-    parser.add_argument( '--pi', '-p', dest='pi', action='store_true', 
+    parser.add_argument( '--pi', '-P', dest='pi', action='store_true', 
         help='Aggregate data by PI only.',
         default=False )
     parser.add_argument( '--free-cores', '-f', dest='free_cores', 
