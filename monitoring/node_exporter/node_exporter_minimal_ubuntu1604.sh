@@ -60,6 +60,7 @@ EOL
 
 systemctl daemon-reload
 systemctl start node_exporter
+systemctl enable node_exporter
 systemctl --no-pager status node_exporter
 
 rm -f node_exporter-0.15.1.linux-amd64.tar.gz

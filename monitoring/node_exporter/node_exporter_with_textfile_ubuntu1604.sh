@@ -42,7 +42,6 @@ ExecStart=/opt/node_exporter/node_exporter  --no-collector.arp \
         --no-collector.netstat \
         --no-collector.sockstat \
         --no-collector.stat \
-        --no-collector.textfile \
         --no-collector.time \
         --no-collector.timex \
         --no-collector.uname \
@@ -67,6 +66,7 @@ EOL
 
 systemctl daemon-reload
 systemctl start node_exporter
+systemctl enable node_exporter
 systemctl --no-pager status node_exporter
 
 rm -f node_exporter-0.15.1.linux-amd64.tar.gz
