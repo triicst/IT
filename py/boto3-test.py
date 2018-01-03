@@ -19,5 +19,5 @@ mybucket = s3.create_bucket(Bucket='mytestbucket1')
 #mybucket = s3.Bucket('mytestbucket')
 
 # upload a file
-mybucket.upload_file('/tmp/sys_status.rpt', '/tmp/sys_status.rpt.txt')
+mybucket.upload_file('/tmp/sys_status.rpt', 'sys_status.rpt.txt')
 
