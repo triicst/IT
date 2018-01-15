@@ -10,6 +10,10 @@ import sys, os, argparse, time, socket, subprocess, pandas, numpy, tempfile, dat
 
 class KeyboardInterruptError(Exception): pass
 
+prometheus_folder = '/opt/node_exporter/metrics_dump'
+default_cluster = 'gizmo'
+default_partition = 'campus'
+
 def main():
 
     # Set up logging.  Show error messages by default, show debugging 
@@ -31,13 +35,17 @@ def main():
 
     headeroffset = 0
     if args.cluster != '':
-        headeroffset = 1lurm_nodes
+        headeroffset = 1
         squeuecmd.append('--cluster=%s' % args.cluster)
         sinfocmd.append('--cluster=%s' % args.cluster)
+    else:
+        args.cluster = default_cluster
 
     if args.partition != '':
         squeuecmd.append('--partition=%s' % args.partition)
         sinfocmd.append('--partition=%s' % args.partition)
+    else:
+        args.partition = default_partition
         
     squeue = subprocess.Popen(squeuecmd, stdout=subprocess.PIPE)
     sinfo = subprocess.Popen(sinfocmd, stdout=subprocess.PIPE)
@@ -75,7 +83,7 @@ def main():
             
     log.info('Cores: running=%i, pending=%i, total=%i, Usage=%i %%, Limits: %i / %i, Nodes: idle=%i' % 
             (jrunning, jpending, tcores, int(jrunning/tcores*100), alimitold, ulimitold, idlenodes))
-
+        
     # are there fewer pending jobs that our minimum threshold?
     if jpending < args.minpending:
         log.debug('Not adjusting limits, not enough pending jobs')
@@ -120,6 +128,19 @@ def main():
                 
     sacctmgrupd = sacctmgrupd.replace('#UCPU#', str(ulimitnew))
     sacctmgrupd = sacctmgrupd.replace('#ACPU#', str(alimitnew)) 
+    
+    if not os.path.exists(prometheus_folder):        
+        os.makedirs(prometheus_folder)
+    with open(os.path.join(prometheus_folder,'hpc_%s_%s_account_limit.prom' % (args.cluster, args.partition)), 'w') as fh:
+        # writing prometheus exporters
+        fh.write('# TYPE hpc_%s_%s_account_limit_current gauge\n' % (args.cluster, args.partition))
+        fh.write('hpc_%s_%s_account_limit_current %s\n\n' % (args.cluster, args.partition, alimitnew))
+        fh.write('# TYPE hpc_%s_%s_account_limit_sla gauge\n' % (args.cluster, args.partition))
+        fh.write('hpc_%s_%s_account_limit_sla %s\n\n' % (args.cluster, args.partition, args.slalimit))
+        fh.write('# TYPE hpc_%s_%s_account_limit_max gauge\n' % (args.cluster, args.partition))
+        fh.write('hpc_%s_%s_account_limit_max %s\n\n' % (args.cluster, args.partition, args.maxlimit))
+        fh.write('# TYPE hpc_%s_%s_account_limit_min gauge\n' % (args.cluster, args.partition))
+        fh.write('hpc_%s_%s_account_limit_min %s\n\n' % (args.cluster, args.partition, args.minlimit))
     
     # only execute sacctmgr if there is actually a change 
     if alimitnew != alimitold or ulimitnew != ulimitold:
