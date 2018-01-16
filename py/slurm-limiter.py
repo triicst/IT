@@ -129,10 +129,11 @@ def main():
     sacctmgrupd = sacctmgrupd.replace('#UCPU#', str(ulimitnew))
     sacctmgrupd = sacctmgrupd.replace('#ACPU#', str(alimitnew)) 
     
+    # adding prometheus exporters for monitoring. 
     if not os.path.exists(prometheus_folder):        
         os.makedirs(prometheus_folder)
-    with open(os.path.join(prometheus_folder,'hpc_%s_%s_account_limit.prom' % (args.cluster, args.partition)), 'w') as fh:
-        # writing prometheus exporters
+    # exporter for displaying account limits (# of cores)
+    with open(os.path.join(prometheus_folder,'hpc_%s_%s_account_limit.prom' % (args.cluster, args.partition)), 'w') as fh:        
         fh.write('# TYPE hpc_%s_%s_account_limit_current gauge\n' % (args.cluster, args.partition))
         fh.write('hpc_%s_%s_account_limit_current %s\n\n' % (args.cluster, args.partition, alimitnew))
         fh.write('# TYPE hpc_%s_%s_account_limit_sla gauge\n' % (args.cluster, args.partition))
@@ -141,7 +142,13 @@ def main():
         fh.write('hpc_%s_%s_account_limit_max %s\n\n' % (args.cluster, args.partition, args.maxlimit))
         fh.write('# TYPE hpc_%s_%s_account_limit_min gauge\n' % (args.cluster, args.partition))
         fh.write('hpc_%s_%s_account_limit_min %s\n\n' % (args.cluster, args.partition, args.minlimit))
-    
+    # exporter for displaying % utilization 
+    with open(os.path.join(prometheus_folder,'hpc_%s_%s_usage_percent.prom' % (args.cluster, args.partition)), 'w') as fh:
+        fh.write('# TYPE hpc_%s_%s_usage_percent_max gauge\n' % (args.cluster, args.partition))
+        fh.write('hpc_%s_%s_usage_percent_max %s\n\n' % (args.cluster, args.partition, args.maxpercentuse))
+        fh.write('# TYPE hpc_%s_%s_usage_percent_current gauge\n' % (args.cluster, args.partition))
+        fh.write('hpc_%s_%s_usage_percent_current %s\n\n' % (args.cluster, args.partition, int(jrunning/tcores*100)))
+                  
     # only execute sacctmgr if there is actually a change 
     if alimitnew != alimitold or ulimitnew != ulimitold:
         log.info('executing %s ...' % sacctmgrupd)
