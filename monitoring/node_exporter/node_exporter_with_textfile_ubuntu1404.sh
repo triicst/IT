@@ -10,6 +10,7 @@ fi
 
 if [ ! -d /opt/node_exporter/metrics_dump ]; then
   mkdir /opt/node_exporter/metrics_dump 
+  chmod 777 /opt/node_exporter/metrics_dump
 fi
 
 cp node_exporter-0.15.1.linux-amd64/node_exporter /opt/node_exporter/node_exporter
