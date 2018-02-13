@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"net"
 	"os"
 	"runtime"
@@ -23,7 +24,7 @@ type scanResult struct {
 func main() {
 	// define and set default command parameter flags
 	var ipFlag = flag.String("ip", "", "Required: IP address or CIDR block to scan")
-	var pFlag = flag.String("p", "", "Required: Set of ports to scan; individal ports separated by \",\" port ranges separated by \"-\" (22,80,8000-8100)")
+	var pFlag = flag.String("p", "", "Required: Set of ports to scan; individual ports separated by \",\" port ranges separated by \"-\" (22,80,8000-8100)")
 	var toFlag = flag.Int("to", 100, "Optional: Specify the amount of time to wait in milliseconds; defaults to 100 ")
 	var tFlag = flag.Int("t", runtime.NumCPU(), "Optional: set number of CPU threads to use; defaults to the number of logical CPUs in your system")
 	var cFlag = flag.Int("c", runtime.NumCPU()*32, "Optional: set number of concurrent port open operations to use; defaults to 32 per logical CPU")
@@ -33,7 +34,7 @@ func main() {
 
 	// usage function that's executed if a required flag is missing or user asks for help (-h)
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "\nUsage: %s [-t <cpu threads> -c <concurrency> -to <timeout in ms> -v] -ip <ip or cidr> -p <ports>\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "\nUsage: %s [-t <cpu threads> -c <concurrency> -to <timeout in ms> -v] -ip <IP or CIDR> -p <ports>\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "\nExample: %s -ip 140.107.73.1/28 -p 22,80,443,8000-8100\n\n", os.Args[0])
 		flag.PrintDefaults()
 		fmt.Println()
@@ -72,6 +73,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// shuffle the order of the ports to make it less obvious that we are port scanning
+	shufflePorts(ports)
 
 	// slice to hold all IP addresses to scan
 	ips := []string{}
@@ -86,6 +89,8 @@ func main() {
 			log.Fatal(err)
 		}
 		ips = ipss
+		// shuffle the order of IP addresses to make it less obvious that we are port scanning
+		shuffleIPs(ips)
 	}
 
 	// about do do some work, start the timer
@@ -148,6 +153,24 @@ func inc(ip net.IP) {
 		if ip[j] > 0 {
 			break
 		}
+	}
+}
+
+// randomly shuffles slice of strings
+func shuffleIPs(slice []string) {
+	rand.Seed(time.Now().UTC().UnixNano())
+	for i := range slice {
+		j := rand.Intn(i + 1)
+		slice[i], slice[j] = slice[j], slice[i]
+	}
+}
+
+// randomly shuffles slice of ints
+func shufflePorts(slice []int) {
+	rand.Seed(time.Now().UTC().UnixNano())
+	for i := range slice {
+		j := rand.Intn(i + 1)
+		slice[i], slice[j] = slice[j], slice[i]
 	}
 }
 

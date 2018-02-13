@@ -5,7 +5,7 @@ Simple TCP port scanner written in Golang
 ## Usage
 
 ```
-Usage: ./goports [-t <cpu threads> -c <concurrency> -to <timeout in ms> -v] -ip <ip or cidr> -p <ports>
+Usage: ./goports [-t <cpu threads> -c <concurrency> -to <timeout in ms> -v] -ip <IP or CIDR> -p <ports>
 
 Example: ./goports -ip 192.168.73.1/28 -p 22,80,443,8000-8100
 
@@ -16,7 +16,7 @@ Example: ./goports -ip 192.168.73.1/28 -p 22,80,443,8000-8100
     	Required: IP address or CIDR block to scan
 
   -p string
-    	Required: Set of ports to scan; individal ports separated by "," port ranges separated by "-" (22,80,8000-8100)
+    	Required: Set of ports to scan; individual ports separated by "," port ranges separated by "-" (22,80,8000-8100)
 
   -t int
     	Optional: set number of CPU threads to use; defaults to the number of logical CPUs in your system (default 4)
