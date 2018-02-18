@@ -10,31 +10,62 @@ def main():
         
     results = searchHutchAuthor(author)
     id_list = results['IdList']
-    papers = fetch_details(id_list)
+    papers = None
+    try:
+        papers = fetch_details(id_list)
+    except:
+        pass
+    if not papers:
+        print("no papers found")
+        return False 
+        
+    j=0
+    rank = 0
+    month=""
+    year=""
     for i, paper in enumerate(papers['PubmedArticle']):
         article = paper['MedlineCitation']['Article']
-        print("%d) %s" % (i+1, article['ArticleTitle']))        
         journal = article['Journal']
         authors = article['AuthorList']
+        aids=article['ELocationID']
         journalinfo = paper['MedlineCitation']['MedlineJournalInfo']
+        
+        if len(authors) > 0:
+            rank, author = authorRank(authors, author)
+        #if rank == 0 or (rank > 1 and rank < len(authors)-3):
+            #only show pubs with first and last author 
+        #    continue
+        #if len(aids)==0:
+        #    continue
+        if 'Month' in journal['JournalIssue']['PubDate']:
+            month=journal['JournalIssue']['PubDate']['Month']
+            year=journal['JournalIssue']['PubDate']['Year']
+        
+        if year == '' or year < args.sinceyear:
+            continue
+        
+        j+=1
+        print("%d) %s" % (j, article['ArticleTitle']))    
         
         ISSN = ''
         if 'ISSNLinking' in journalinfo:
             ISSN = journalinfo['ISSNLinking']
-        
+        if len(aids)>0: 
+            print("    ID: %s" % aids[0])
         print("    Journal: %s, ISSN: %s" % (journal['Title'], ISSN))
-        if 'Month' in journal['JournalIssue']['PubDate']:
-            print("    Year: %s, Month: %s" % (journal['JournalIssue']['PubDate']['Year'], 
-                   journal['JournalIssue']['PubDate']['Month']))
+        
+        print("    Year: %s, Month: %s" % (year, month))
             
         #print(json.dumps(article, indent=2))
+        #sys.exit()
         
-        print("    # of Authors: ", len(authors))                
-        ret = authorRank(authors, author)
+        print("    # of Authors: ", len(authors))   
+        print("    %s rank: %s" % (author, rank) )             
+        
         
         if 'GrantList' in article:
             ret = getgrants(article['GrantList'])
-                
+                      
         
 def getgrants (grants):
     for g in grants:
@@ -46,26 +77,24 @@ def authorRank (authors, author):
     lastname = ''
     forename = ''
     initials = ''
-    if author[-2:-1] == ' ':
-        lastname = author[:-2]
-        initials = author[-1:]
+    pos = author.find(' ')
+    if pos > 0:
+        lastname = author[:pos]
+        forename = author[pos+1:]
     else:
-        pos = author.find(' ')
-        if pos > 0:
-            lastname, forename = author.split(' ')
-        else:
-            lastname = author
-            
+        lastname = author
     i=0
     for a in authors:
         i+=1
         #if a['AffiliationInfo']:
         #    print ("  ", a['AffiliationInfo'][0]['Affiliation'])            
         if 'LastName' in a:
-            if a['LastName'] == lastname and a['ForeName'] == forename:
-                print ("    ",i, a['LastName'], a['ForeName'])
+            if a['LastName'] == lastname and a['ForeName'].startswith(forename):
+                return [i, a['LastName'] + ' ' + a['ForeName']]
             elif a['LastName'] == lastname and initials in a['Initials']:
-                print ("    ",i, a['LastName'], a['Initials'])
+                return [i, a['LastName'] + ' ' + a['Initials']]
+            elif a['LastName'].lower() == lastname.lower():
+                return [i, a['LastName'] + ' ' + a['ForeName'] + ' (' + a['Initials'] + ')']
     
 def search(query):
     Entrez.email = 'your.email@example.com'
@@ -196,7 +225,10 @@ def parse_arguments():
         'pubmed publications per hutch author')
     parser.add_argument('author', action='store', 
         help='Please enter search as "Doe J" or "Doe John" ' + \
-         '!')        
+         '!')
+    parser.add_argument('sinceyear', action='store', 
+        help=' search for authorship since year ' + \
+         '!')  
     #parser.add_argument('dsn', action='store', 
         #help='postgres connection string, format postgresql://username@hostname:port/database ' + \
          #'or ~/.pgpass style credentials such as hostname:port:database:username')
