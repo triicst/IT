@@ -89,13 +89,15 @@ def authorRank (authors, author):
         #if a['AffiliationInfo']:
         #    print ("  ", a['AffiliationInfo'][0]['Affiliation'])            
         if 'LastName' in a:
-            if a['LastName'] == lastname and a['ForeName'].startswith(forename):
-                return [i, a['LastName'] + ' ' + a['ForeName']]
-            elif a['LastName'] == lastname and initials in a['Initials']:
-                return [i, a['LastName'] + ' ' + a['Initials']]
-            elif a['LastName'].lower() == lastname.lower():
-                return [i, a['LastName'] + ' ' + a['ForeName'] + ' (' + a['Initials'] + ')']
-    
+            if 'ForeName' in a and 'Initials' in a:
+                if a['LastName'].lower() == lastname.lower() and a['ForeName'].startswith(forename):
+                    return [i, a['LastName'] + ' ' + a['ForeName']]
+                elif a['LastName'].lower() == lastname.lower():
+                    return [i, a['LastName'] + ' ' + a['ForeName'] + ' (' + a['Initials'] + ')']
+            elif 'Initials' in a:
+                if a['LastName'] == lastname and initials in a['Initials']:
+                    return [i, a['LastName'] + ' ' + a['Initials']]
+                
 def search(query):
     Entrez.email = 'your.email@example.com'
     handle = Entrez.esearch(db='pubmed', 
@@ -226,7 +228,7 @@ def parse_arguments():
     parser.add_argument('author', action='store', 
         help='Please enter search as "Doe J" or "Doe John" ' + \
          '!')
-    parser.add_argument('sinceyear', action='store', 
+    parser.add_argument('sinceyear', action='store', nargs='?', default='',  
         help=' search for authorship since year ' + \
          '!')  
     #parser.add_argument('dsn', action='store', 
