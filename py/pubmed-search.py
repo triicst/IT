@@ -1,28 +1,73 @@
 #! /usr/bin/env python3
 
-import os, sys, psycopg2, argparse, csv, json
+import os, sys, psycopg2, argparse, csv, json, requests, os
 from Bio import Entrez
 from collections import OrderedDict
   
 def main():
 
     author = args.author
+    
+    if not os.path.exists(author):
         
-    results = searchHutchAuthor(author)
-    id_list = results['IdList']
-    papers = None
-    try:
+        results = searchHutchAuthor(author)            
+        id_list = results['IdList']
         papers = fetch_details(id_list)
-    except:
-        pass
-    if not papers:
-        print("no papers found")
-        return False 
+        if not papers:
+            print("no papers found for %s" % author)
+            return False
         
+        pos = author.find(' ')
+        lastname = author
+        forename = ''
+        if pos > 0:
+            lastname = author[:pos]
+            forename = author[pos+1:]
+        
+        pubrows=showPapers(papers, author, lastname, forename)            
+            
+        return True
+        
+    #namein="/home/petersen/test/GizmoUsageScientificPrioritiesShort.csv"
+    #nameout="/home/petersen/test/GizmoUsagePublicationsShort.csv"
+    namein=author
+    nameout=os.path.splitext(namein)[0]+'-publications.csv'
+    
+    j = requests.get('https://toolbox.fhcrc.org/json/pi_all.json').json()
+    
+    with open(namein, 'r') as infile, open(nameout, 'w') as outfile:
+        writer = csv.writer(outfile, lineterminator='\n')
+        for row in csv.reader(infile):
+            
+            if not '_' in row[0]:
+                continue
+            
+            lastname = jsearchone(j,"pi_dept", row[0], "sn")    
+            forename = jsearchone(j,"pi_dept", row[0], "givenName")
+            
+            author = row[0].replace('_', ' ')
+                
+            results = searchHutchAuthor(author)            
+            id_list = results['IdList']
+            papers = fetch_details(id_list)
+            if not papers:
+                print("no papers found for %s" % author)
+                continue 
+            
+            if lastname:
+                pubrows=showPapers(papers, row[0], lastname, forename)
+            
+                for pubrow in pubrows:
+                    writer.writerow(pubrow)
+                
+def showPapers(papers, pi, lastname, forename):
     j=0
-    rank = 0
-    month=""
-    year=""
+    rank=0
+    month=''
+    year=''
+    aid=''
+    ISSN=''
+    rows=[]
     for i, paper in enumerate(papers['PubmedArticle']):
         article = paper['MedlineCitation']['Article']
         journal = article['Journal']
@@ -30,8 +75,9 @@ def main():
         aids=article['ELocationID']
         journalinfo = paper['MedlineCitation']['MedlineJournalInfo']
         
+        retlst = []
         if len(authors) > 0:
-            rank, author = authorRank(authors, author)
+            rank, author = authorRank(authors, lastname, forename)
         #if rank == 0 or (rank > 1 and rank < len(authors)-3):
             #only show pubs with first and last author 
         #    continue
@@ -47,11 +93,12 @@ def main():
         j+=1
         print("%d) %s" % (j, article['ArticleTitle']))    
         
-        ISSN = ''
         if 'ISSNLinking' in journalinfo:
             ISSN = journalinfo['ISSNLinking']
         if len(aids)>0: 
+            aid=aids[0]
             print("    ID: %s" % aids[0])
+
         print("    Journal: %s, ISSN: %s" % (journal['Title'], ISSN))
         
         print("    Year: %s, Month: %s" % (year, month))
@@ -65,38 +112,58 @@ def main():
         
         if 'GrantList' in article:
             ret = getgrants(article['GrantList'])
-                      
+        
+        # returns pi, author, aid, title, year, month, authorcount, authorpos, journal, issn
+        
+        rows.append([pi, author, aid, article['ArticleTitle'], year, month, len(authors), 
+               rank, journal['Title'], ISSN])
+    return rows
+
         
 def getgrants (grants):
     for g in grants:
         if 'GrantID' in g:
-            print("    ",g['GrantID'],"(",g['Agency'],")")
+            print("   ",g['GrantID'],"(",g['Agency'],")")
         
+def jsearchone(json,sfld,search,rfld):
+    """ return the first search result of a column based search """
+    for j in json:
+        if j[sfld]==search:
+            return j[rfld].strip()
     
-def authorRank (authors, author):
-    lastname = ''
-    forename = ''
+def authorRank (authors, lastname, forename):
     initials = ''
-    pos = author.find(' ')
-    if pos > 0:
-        lastname = author[:pos]
-        forename = author[pos+1:]
-    else:
-        lastname = author
     i=0
+    retlist=[]
     for a in authors:
         i+=1
         #if a['AffiliationInfo']:
         #    print ("  ", a['AffiliationInfo'][0]['Affiliation'])            
+        if 'LastName' in a and lastname:
+            if 'ForeName' in a:
+                #print ("FORENAME", a['ForeName'], forename)
+                if a['LastName'].lower() == lastname.lower() and \
+                        (forename in a['ForeName'] \
+                        or a['ForeName'] in forename):
+                    #retlist = [i, a['LastName'] + ' ' + a['ForeName'] + ' (' + a['Initials'] + ')']
+                    retlist = [i, a['LastName'] + ' ' + a['ForeName']]
+
+    if len(retlist) > 0:
+        return retlist
+    i=0
+    for a in authors:
+        i+=1
         if 'LastName' in a:
-            if 'ForeName' in a and 'Initials' in a:
-                if a['LastName'].lower() == lastname.lower() and a['ForeName'].startswith(forename):
-                    return [i, a['LastName'] + ' ' + a['ForeName']]
-                elif a['LastName'].lower() == lastname.lower():
-                    return [i, a['LastName'] + ' ' + a['ForeName'] + ' (' + a['Initials'] + ')']
-            elif 'Initials' in a:
-                if a['LastName'] == lastname and initials in a['Initials']:
-                    return [i, a['LastName'] + ' ' + a['Initials']]
+            if 'Initials' in a:
+                #print("LAST", a['LastName'], lastname)
+                if a['LastName'].lower() == lastname.lower() and initials in a['Initials']:
+                    retlist = [i, a['LastName'] + ' ' + a['Initials']]            
+
+    if len(retlist) > 0:
+        return retlist
+    else:
+        return 0, ""
+    
                 
 def search(query):
     Entrez.email = 'your.email@example.com'
@@ -122,12 +189,15 @@ def searchHutchAuthor(author):
 
 def fetch_details(id_list):
     ids = ','.join(id_list)
-    Entrez.email = 'your.email@example.com'
-    handle = Entrez.efetch(db='pubmed',
-                           retmode='xml',
-                           id=ids)
-    results = Entrez.read(handle)
-    return results
+    try:
+        Entrez.email = 'your.email@example.com'
+        handle = Entrez.efetch(db='pubmed',
+                               retmode='xml',
+                               id=ids)
+        results = Entrez.read(handle)
+        return results
+    except:
+        return None
 
 
     #pgpass = os.getenv('PGPASSFILE', os.path.expanduser('~/.pgpass'))
@@ -222,13 +292,14 @@ def parse_arguments():
     """
     Gather command-line arguments.
     """
-    parser = argparse.ArgumentParser(prog='pubmed',
+    parser = argparse.ArgumentParser(prog='pubmed-search',
         description='a tool for quickly searching ' + \
-        'pubmed publications per hutch author')
-    parser.add_argument('author', action='store', 
+        'pubmed publications per Hutch author')
+    parser.add_argument('author', action='store', default='',
         help='Please enter search as "Doe J" or "Doe John" ' + \
-         '!')
-    parser.add_argument('sinceyear', action='store', nargs='?', default='',  
+         'or enter a text file name (e.g. csv) that contains a list of authors!')
+    parser.add_argument('--sinceyear', '-s', dest='sinceyear', 
+        action='store', default='',  
         help=' search for authorship since year ' + \
          '!')  
     #parser.add_argument('dsn', action='store', 
