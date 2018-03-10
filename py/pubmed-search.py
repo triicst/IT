@@ -10,21 +10,17 @@ def main():
     
     if not os.path.exists(author):
         
-        results = searchHutchAuthor(author)            
+        if "_" in author:
+            author=author.replace('_', ' ')
+        lastname, forename, initials = splitName(author)
+        results = searchHutchAuthor(lastname + ' ' + forename)            
         id_list = results['IdList']
         papers = fetch_details(id_list)
         if not papers:
             print("no papers found for %s" % author)
             return False
         
-        pos = author.find(' ')
-        lastname = author
-        forename = ''
-        if pos > 0:
-            lastname = author[:pos]
-            forename = author[pos+1:]
-        
-        pubrows=showPapers(papers, author, lastname, forename)            
+        pubrows=showPapers(papers, author, lastname, forename, initials)            
             
         return True
         
@@ -59,8 +55,24 @@ def main():
             
                 for pubrow in pubrows:
                     writer.writerow(pubrow)
-                
-def showPapers(papers, pi, lastname, forename):
+
+
+def splitName(fullname):
+        fullname = fullname.replace(',', ' ')
+        fullname = fullname.replace('.', '')
+        name=fullname.split()
+        lastname = name[0]
+        forename = ''
+        initials = ''
+        if len(name) > 1:
+            forename=name[1]
+            initials=forename[0]
+            if len(name) == 3:
+                forename = name[1] + ' ' + name[2]
+                initials = name[1][0] + name[2][0]
+        return lastname, forename, initials
+
+def showPapers(papers, pi, lastname, forename, initials):
     j=0
     rank=0
     month=''
@@ -77,7 +89,7 @@ def showPapers(papers, pi, lastname, forename):
         
         retlst = []
         if len(authors) > 0:
-            rank, author = authorRank(authors, lastname, forename)
+            rank, author = authorRank(authors, lastname, forename, initials)
         #if rank == 0 or (rank > 1 and rank < len(authors)-3):
             #only show pubs with first and last author 
         #    continue
@@ -131,22 +143,56 @@ def jsearchone(json,sfld,search,rfld):
         if j[sfld]==search:
             return j[rfld].strip()
     
-def authorRank (authors, lastname, forename):
-    initials = ''
+def authorRank (authors, lastname, forename, initials):
+    """ get the position of a person in an author list  """
     i=0
     retlist=[]
     for a in authors:
         i+=1
         #if a['AffiliationInfo']:
-        #    print ("  ", a['AffiliationInfo'][0]['Affiliation'])            
+        #    print ("Affiliation: ", a['AffiliationInfo'][0]['Affiliation'])            
         if 'LastName' in a and lastname:
             if 'ForeName' in a:
                 #print ("FORENAME", a['ForeName'], forename)
                 if a['LastName'].lower() == lastname.lower() and \
-                        (forename in a['ForeName'] \
-                        or a['ForeName'] in forename):
+                        (forename.lower() in a['ForeName'].lower() \
+                        or a['ForeName'].lower() in forename.lower()):
                     #retlist = [i, a['LastName'] + ' ' + a['ForeName'] + ' (' + a['Initials'] + ')']
                     retlist = [i, a['LastName'] + ' ' + a['ForeName']]
+
+
+    if len(retlist) > 0:
+        return retlist
+    i=0
+    for a in authors:
+        i+=1
+        if 'LastName' in a:
+            if 'Initials' in a:
+                #print("LAST", a['LastName'], lastname)
+                if a['LastName'].lower() == lastname.lower() and initials in a['Initials']:
+                    retlist = [i, a['LastName'] + ' ' + a['Initials']]            
+
+    if len(retlist) > 0:
+        return retlist
+    else:
+        return 0, ""
+
+def getPeers (j, authors, lastname, forename, initials):
+    i=0
+    retlist=[]
+    for a in authors:
+        i+=1
+        #if a['AffiliationInfo']:
+        #    print ("Affiliation: ", a['AffiliationInfo'][0]['Affiliation'])            
+        if 'LastName' in a and lastname:
+            if 'ForeName' in a:
+                #print ("FORENAME", a['ForeName'], forename)
+                if a['LastName'].lower() == lastname.lower() and \
+                        (forename.lower() in a['ForeName'].lower() \
+                        or a['ForeName'].lower() in forename.lower()):
+                    #retlist = [i, a['LastName'] + ' ' + a['ForeName'] + ' (' + a['Initials'] + ')']
+                    retlist = [i, a['LastName'] + ' ' + a['ForeName']]
+
 
     if len(retlist) > 0:
         return retlist
