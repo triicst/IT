@@ -137,11 +137,6 @@ def getgrants (grants):
         if 'GrantID' in g:
             print("   ",g['GrantID'],"(",g['Agency'],")")
         
-def jsearchone(json,sfld,search,rfld):
-    """ return the first search result of a column based search """
-    for j in json:
-        if j[sfld]==search:
-            return j[rfld].strip()
     
 def authorRank (authors, lastname, forename, initials):
     """ get the position of a person in an author list  """
@@ -178,6 +173,9 @@ def authorRank (authors, lastname, forename, initials):
         return 0, ""
 
 def getPeers (j, authors, lastname, forename, initials):
+    
+    fullPINames=uniq(jget(j,'displayName'))
+    
     i=0
     retlist=[]
     for a in authors:
@@ -244,6 +242,29 @@ def fetch_details(id_list):
         return results
     except:
         return None
+
+def jsearchone(json,sfld,search,rfld):
+    """ return the first search result of a column based search """
+    for j in json:
+        if j[sfld]==search:
+            return j[rfld].strip()
+
+def jget(json,rfld):
+    """ return all values in one column """
+    lst=[]
+    for j in json:
+        if j[rfld].strip() != "":
+            lst.append(j[rfld].strip())
+    return lst
+
+def uniq(seq):
+    """ remove duplicates from a list """
+    # Not order preserving
+    keys = {}
+    for e in seq:
+        keys[e] = 1
+    return list(keys.keys())            
+
 
 
     #pgpass = os.getenv('PGPASSFILE', os.path.expanduser('~/.pgpass'))
