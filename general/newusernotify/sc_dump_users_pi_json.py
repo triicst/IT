@@ -249,7 +249,7 @@ for row in rows:
         d['division'] = row[11]
         objects_list.append(d)
 
-conn.close()
+conn.commit()
 
 j = json.dumps(objects_list, indent=4, default=lambda x:str(x))
 with open(outfolder + '/json/pi_all.json', 'w') as f:
@@ -259,6 +259,43 @@ with open(outfolder + '/csv/pi_all.csv', 'w') as f:
         mycsv = csv.writer(f, dialect='excel')
         mycsv.writerow(columns)
         mycsv.writerows(rows)
+
+# listing just the faculty without the staff scientists
+
+cursor = conn.cursor()
+cursor.execute('SELECT * FROM SC_pi_all;')
+columns = [i[0] for i in cursor.description]
+rows = cursor.fetchall()
+
+objects_list = []
+objects_list_today = []
+for row in rows:
+        d = collections.OrderedDict()
+        d['pi_dept'] = row[0]
+        d['employeeID'] = row[1]
+        d['uid'] = row[2]
+        d['displayName'] = row[3]
+        d['sn'] = row[4]
+        d['givenName'] = row[5].strip()
+        d['mail'] = row[6]
+        d['jobTitle'] = row[7]
+        d['businessTitle'] = row[8]
+        d['mgrName'] = row[9]
+        d['department'] = row[10]
+        d['division'] = row[11]
+        objects_list.append(d)
+
+conn.close()
+
+j = json.dumps(objects_list, indent=4, default=lambda x:str(x))
+with open(outfolder + '/json/faculty.json', 'w') as f:
+        f.write(j)
+
+with open(outfolder + '/csv/faculty.csv', 'w') as f:
+        mycsv = csv.writer(f, dialect='excel')
+        mycsv.writerow(columns)
+        mycsv.writerows(rows)
+
 
 sys.exit()
 
