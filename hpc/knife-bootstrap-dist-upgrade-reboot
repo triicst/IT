@@ -1,0 +1,90 @@
+#! /bin/bash
+
+# this script installs the Chef client via knife on multiple nodes, 
+# updates the kernel and reboots the machine. 
+
+echo -e "\nPlease rename ~/.ssh/known_hosts temporarily to avoid errors.\n"
+
+if ! [[ -f /usr/bin/fping ]]; then
+  echo "please install the 'fping' package on this machine:"
+  echo "sudo apt-get -y install fping"
+  exit
+fi
+
+if [[ $# -ne 1 ]]; then
+  echo "need a llnl hostlist as the single argument, example:"
+  echo "${0##*/} gizmoe[1-23,25]" 
+  echo ""
+  echo "please also ensure you use ssh-agent:"
+  echo 'eval $(ssh-agent -s); ssh-add ~/.ssh/id_rsa_for_you' 
+  exit
+fi
+
+runssh() {
+  #ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa_prox root@${host} $1
+  ssh -q -o ForwardX11=no -o StrictHostKeyChecking=no root@${host} $1
+}
+
+if ! hash hostlist 2>/dev/null; then
+  echo "Loading Python to get the hostlist command"
+  ml Python
+fi
+
+# first create a list of hosts that are pingable
+hosts=''
+tryhosts=$(hostlist -e $1)
+for host in $tryhosts; do
+  if fping -c1 -t100 $host > /dev/null 2>&1; then 
+    hosts="${hosts} ${host}"
+  else
+    echo "no ping to ${host}"
+  fi
+done
+hosts="${hosts:1}"
+
+echo -e "\n   Check if jobs are running on ${hosts} ...\n"
+
+read -r -p "   Do you want to limit the upgrade to unused slurm nodes ? [Y/n]" response
+response=${response,,} # tolower
+if [[ $response =~ ^(yes|y| ) ]] || [[ -z $response ]]; then
+  hosts=$(sinfo -N -t DOWN,DRAINED,IDLE,MAINT,RESERVED --responding --noheader -h -o "%N" -n "${hosts}" | uniq | tr '\n' ' ')
+else
+  sinfo -N -S %-T -o "%12N %10T %P" -n "${hosts}"
+fi
+
+if [[ -z ${hosts} ]]; then
+  echo -e "\n   no unused slurm nodes in list, exiting ... \n"
+  exit
+fi
+
+echo -e "\n   Updating nodes ${hosts} ....\n"
+read -r -p "   Do you want to continue ? [y/N]" response
+response=${response,,} # tolower
+if [[ $response =~ ^(no|n| ) ]] || [[ -z $response ]]; then
+   exit
+fi
+
+read -r -p "   Do you want to be prompted to confirm overwriting the Chef config for each node [y/N]" response
+response=${response,,} # tolower
+overwrite=""
+if [[ $response =~ ^(no|n| ) ]] || [[ -z $response ]]; then
+   overwrite="--yes"
+fi
+
+for host in $hosts; do 
+    echo "  updating $host ....."
+    runssh "uname -a"
+    runssh "dpkg --configure -a"
+    # if you are not using ssh-agent for knife, you can also use 
+    # something like:  --ssh-identity-file ~/.ssh/id_rsa
+    knife bootstrap ${overwrite} --no-host-key-verify --ssh-user root --environment scicomp_prod --bootstrap-version 12.19.36 --server-url "https://chef.fhcrc.org/organizations/cit" --run-list 'role[cit-base]' --node-name ${host} ${host}
+    runssh "apt-get -y update"
+    runssh "apt-get -y dist-upgrade"
+    reboot_required=$(runssh '[[ -f /var/run/reboot-required ]] && echo "yes" || echo "no"')
+    echo -e "Reboot required: ${reboot_required}"
+    if [[ "${reboot_required}" == "yes" ]]; then
+        echo -e "\n   ### Warning: A reboot is required !\n"
+    fi
+    echo -e "\n   #######  REBOOTING ${host} ..... ###################\n"
+    runssh "reboot"
+done
