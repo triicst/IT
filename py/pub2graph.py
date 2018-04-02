@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-import os, sys, psycopg2, argparse, csv, json, requests, os
+import os, sys, subprocess, argparse, csv, json, requests, os
 from collections import OrderedDict
 
 def main():
@@ -12,6 +12,7 @@ def main():
 
     namein=args.csvfile
     nameout=os.path.splitext(namein)[0]+'-graph.dv'
+    nameoutpdf=os.path.splitext(namein)[0]+'-graph.pdf'
 
     pairs={}
 
@@ -68,6 +69,10 @@ def main():
             # width needs to be devided by two, because the same pub has at least 2 collabs
             outfile.write('%s,penwidth=%s];\n' % (pair, width))  
         outfile.write('}\n')
+
+        # unflatten -f -l 4 -c 6 input.dot | dot | gvpack -array_t6 | neato -s -n2 -Tpng -o output.png
+        ret = subprocess.run("unflatten -f -l20 -c1 %s | dot -T pdf -o %s"
+            % (nameout, nameoutpdf), shell=True)
 
 def getDisplayNames(j, authors):
     #names=authors.split(';')
