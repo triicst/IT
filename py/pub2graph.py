@@ -10,9 +10,12 @@ def main():
 
     j = getToolbox('https://toolbox.fhcrc.org/json/faculty.json')
 
+    division = ""
+    if args.division != "":
+        division = "-" + args.division
     namein=args.csvfile
-    nameout=os.path.splitext(namein)[0]+'.dv'
-    nameoutpdf=os.path.splitext(namein)[0]+'.pdf'
+    nameout=os.path.splitext(namein)[0]+division+'.dv'
+    nameoutpdf=os.path.splitext(namein)[0]+division+'.pdf'
 
     pairs={}
 
@@ -31,8 +34,10 @@ def main():
             if division1 == "CB":
                 division1 = "HB"
             
-            #if division1 != 'VI':
-            #    continue 
+            if division != "":
+                if division1 != args.division:
+                    continue 
+
             department1=jsearchone(j,"pi_dept", row[0], "department")
 
             if row[9]:
@@ -157,10 +162,10 @@ def parse_arguments():
     parser.add_argument('csvfile', action='store', default='',
         help='Please the filename of a csv file ' + \
          'that contains authorship information')
-    #parser.add_argument('--sinceyear', '-s', dest='sinceyear',
-    #    action='store', default='',
-    #    help=' search for authorship since year ' + \
-    #     '!')
+    parser.add_argument('--division', '-d', dest='division',
+        action='store', default='',
+        help=' set Fred Hutch division (BS,CR,HB,PH,VI) ' + \
+         '!')
     #parser.add_argument('dsn', action='store',
         #help='postgres connection string, format postgresql://username@hostname:port/database ' + \
          #'or ~/.pgpass style credentials such as hostname:port:database:username')
