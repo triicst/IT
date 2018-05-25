@@ -62,13 +62,16 @@ def create_objects(instances):
         except:
             i.VpcId = ""
 
-        for tag in instance["Tags"]:
-            if tag['Key'].lower() == 'owner':
-                i.Owner = removebadchars(tag['Value'].lower()) 
-            elif tag['Key'].lower() == 'name':
-                i.Name = removebadchars(tag['Value'].lower())
-            elif tag['Key'].lower() == 'technical_contact':
-                i.TechnicalContact = removebadchars(tag['Value'].lower())
+        try:
+            for tag in instance["Tags"]:
+                if tag['Key'].lower() == 'owner':
+                    i.Owner = removebadchars(tag['Value'].lower()) 
+                elif tag['Key'].lower() == 'name':
+                    i.Name = removebadchars(tag['Value'].lower())
+                elif tag['Key'].lower() == 'technical_contact':
+                    i.TechnicalContact = removebadchars(tag['Value'].lower())
+        except:
+            pass
 
         if not "TechnicalContact" in i.__dict__:
             i.TechnicalContact = 'missing'
