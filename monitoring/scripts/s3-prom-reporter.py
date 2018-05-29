@@ -13,10 +13,8 @@ def main():
 
     totalStd = 0
     totalIAS = 0
+    first_metric = True 
 
-    print("# TYPE s3bucketsize gauge")
-    print("# TYPE s3bucketsize_total gauge")
- 
     for bucket_name in buckets:
         for s3class in ('StandardStorage','StandardIAStorage'):
             response = cloudwatch.get_metric_statistics(
@@ -32,26 +30,30 @@ def main():
                         "Value": s3class 
                     }
                 ],
-                StartTime=datetime.now() - timedelta(days=1),
+                StartTime=datetime.now() - timedelta(days=2),
                 EndTime=datetime.now(),
                 Period=3600,
-                Statistics=['Maximum']
+                Statistics=['Average']
             )  
 
             if not response['Datapoints']:
                 continue
-            bucket_size_bytes = response['Datapoints'][-1]['Maximum']
+            bucket_size_bytes = response['Datapoints'][-1]['Average']
             if s3class == "StandardStorage":
                 totalStd += bucket_size_bytes
             elif s3class == "StandardIAStorage":
                 totalIAS += bucket_size_bytes
             
             if (bucket_size_bytes) > 262144: # only report if bucket size is more than 256KB
+                if first_metric:
+                    print("# TYPE s3bucketsize gauge")
+                    first_metric = False
                 print("s3bucketsize{{account=\"hse\",bucketname=\"{}\",class=\"{}\"}} {}".format(bucket_name, s3class, bucket_size_bytes))
 
-
-    print("s3bucketsize_total{{account=\"hse\",class=\"StandardStorage\"}} {}".format(totalStd))
-    print("s3bucketsize_total{{account=\"hse\",class=\"StandardIAStorage\"}} {}".format(totalIAS))
+    if totalStd > 262144:
+        print("# TYPE s3bucketsize_total gauge")
+        print("s3bucketsize_total{{account=\"hse\",class=\"StandardStorage\"}} {}".format(totalStd))
+        print("s3bucketsize_total{{account=\"hse\",class=\"StandardIAStorage\"}} {}".format(totalIAS))
 
 
 if __name__ == "__main__":
