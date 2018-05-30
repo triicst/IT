@@ -32,13 +32,29 @@ def main():
                 ],
                 StartTime=datetime.now() - timedelta(days=2),
                 EndTime=datetime.now(),
-                Period=3600,
+                Period=86400,
                 Statistics=['Average']
             )  
 
+
             if not response['Datapoints']:
                 continue
-            bucket_size_bytes = response['Datapoints'][-1]['Average']
+            #bucket_size_bytes = response['Datapoints'][-1]['Average']
+            bucket_size_bytes = response['Datapoints']
+
+            # This if/else makes sure that if more than one datapoint is returned, the latest data point is selected and used.
+            if len(bucket_size_bytes) == 1:
+                bucket_size_bytes = bucket_size_bytes[0]['Average']
+            else: # more than one metrics was returned for this bucket/range, we need find the latest metric
+                dates = [] 
+                latest = (datetime.now() - timedelta(days=365))
+                for x in range(len(bucket_size_bytes)):
+                    dates.append(bucket_size_bytes[x]['Timestamp'])
+                for x in dates:
+                    if x.replace(tzinfo=None) > latest.replace(tzinfo=None):
+                        latest = x
+                bucket_size_bytes = bucket_size_bytes[dates.index(latest)]['Average'] # get the latest metric
+
             if s3class == "StandardStorage":
                 totalStd += bucket_size_bytes
             elif s3class == "StandardIAStorage":
