@@ -47,7 +47,7 @@ to install a plugin, in VSCode, click on the square extensions icon in the upper
 
 Below are the recommended plugins for authoring Markdown:
 
-### **Paste Image**
+### **Plugin: Paste Image**
 
 The "Paste Image" plugin is a huge time saver if your documentation will contain lots of images. Install the Paste Image plugin from "mushan".
 
@@ -72,7 +72,7 @@ More information about this plugin is available [**here**](https://marketplace.v
 
 ***NOTE:** To get the Paste Image working on Linux, I had to install the "**xclip**" package on my Workstation (sudo apt install xclip)*
 
-### **Spellchecker**
+### **Plugin: Spellchecker**
 
 VSCode doesn't include a built-in spell checker. To add a spell checker to VSCode, install the "Code Spell Checker" plugin from "Street Side Software". After the plugin is installed (and VSCode reloaded) it should automatically start finding typos. There will be a green squiggly line under the suspect word. If the word is misspelled you can click on the word and a yellow light bulb icon will appear. Click on the light bulb icon and a menu should appear offering you suggestions. If the suspected work is in fact spelled correctly you can use the same context menu to add it to your local dictionary.
 
@@ -82,7 +82,7 @@ VSCode doesn't include a built-in spell checker. To add a spell checker to VSCod
 More information about this plugin is available [**here**](https://marketplace.visualstudio.com/items?itemName=streetsidesoftware.code-spell-checker)
 
 
-### **MarkdownLint**
+### **Plugin: MarkdownLint**
 
 A markdown linter may also be useful to help you write correctly formated makrdown. Install the "markdownlist" plugin from David Anson. It works exactly like the Spellchecker plugin. Hovering your cursor over the green squiggly underline will reveal the warning from the linter; clicking on the light bulb will reveal a click you can click to learn more about what you are doing wrong.
 
