@@ -28,7 +28,7 @@ To see a live side-by-side preview of the rendered markdown document to check th
 
 VSCode has built-in support for Git repositories (you still need Git installed on your workstation if it's not already present).
 
-If the folder you have open to edit files is a Git repo, any changes made to files that you've saved, the "Git" icon **(1)** in the left toolbar will have a blue circle indicating how many un-staged/un-committed files there are. To stage (git add) a file that you wish to commit, click on the Git icon, then the file that you want to stage. Click on the "+" icon **(2)** to stage the file. To commit the changes, enter a commit message in the message box **(3)** and then click the check mark icon (4).
+If the folder you have open to edit files is a Git repo, any changes made to files that you've saved, the "Git" icon **(1)** in the left toolbar will have a blue circle indicating how many un-staged/un-committed files there are. To stage (git add) a file that you wish to commit, click on the Git icon, then the file that you want to stage. Click on the "+" icon **(2)** to stage the file. To commit the changes, enter a commit message in the message box **(3)** and then click the check mark icon **(4)**.
 
 ![](images/2018-06-01-15-18-13.png)
 
