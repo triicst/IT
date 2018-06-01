@@ -12,11 +12,11 @@ VSCode is freely available and is supported on all major operating systems (Wind
 
 ## **Creating and Editing Markdown documents**
 
-To started creating or editing markdown files, you should already have folder (cloned repo) on your workstation, that has exiting markdown files or will contain your new markdown files. From the VSCode "File" menu, select "Open Folder" and navigate to the folder containing files you wish to edit, or to the empty folder you will be creating new documents in. The image below shows and open folder with some markdown files to edit.
+To get started creating or editing markdown files, you should already have folder (cloned repo) on your workstation, that has exiting markdown files or will contain your new markdown files. From the VSCode "File" menu, select "Open Folder" and navigate to the folder containing files you wish to edit, or to the empty folder you will be creating new documents in. The image below shows and open folder with some markdown files to edit.
 
 ![](images/2018-06-01-14-15-23.png)
 
-Select and existing file or create a new file (File --> New File) and save it with the .md extension. When you click in the file name it will open a tab and display the contents of the file.
+Select an existing file or create a new file (File --> New File) and save it with the .md extension. When you click on the file name it will open a tab and display the contents of the file.
 
 To see a live side-by-side preview of the rendered markdown document to check the formatting and see any images, you can click on the split window with magnifying glass icon in the upper right of the open files' tab. After clicking on this tab, a new window will appear on the right and display the rendered markdown.
 
@@ -28,20 +28,20 @@ To see a live side-by-side preview of the rendered markdown document to check th
 
 VSCode has built-in support for Git repositories (you still need Git installed on your workstation if it's not already present).
 
-If the folder you have open to edit files is a Git repo, any changed made to files that you've saved, the "Git" icon **(1)** in the left toolbar will have a blue circle indicating how many un-staged/un-committed files there are. To stage (git add ...) a file that you wish to commit, click on the Git icon, then the file that you want to stage. Click on the "+" icon **(2)** to stage the file. To commit the changes, enter a commit message in the message box **(3)** and then click the check mark icon (4).
+If the folder you have open to edit files is a Git repo, any changes made to files that you've saved, the "Git" icon **(1)** in the left toolbar will have a blue circle indicating how many un-staged/un-committed files there are. To stage (git add) a file that you wish to commit, click on the Git icon, then the file that you want to stage. Click on the "+" icon **(2)** to stage the file. To commit the changes, enter a commit message in the message box **(3)** and then click the check mark icon (4).
 
 ![](images/2018-06-01-15-18-13.png)
 
-To push your changes to a remote repository, pull in any new changes from the remote remote repository and other git functions, click on the "**...**" icon **(5)** to reveal the full Git menu:
+To push your changes to a remote repository, pull in any new changes from the remote remote repository or other git functions, click on the "**...**" icon **(5)** to reveal the full Git menu:
 
 ![](images/2018-06-01-15-19-56.png)
 
 
 ## **Installing Plugins**
 
-After you have VSCode in stalled, can started creating and editing markdown files right away, but there are a few VSCode plugins that will be very helpful. These plugins will allow you to easily paste images into your document and check your spelling.
+After you have VSCode in stalled, you can start creating and editing markdown files right away, but there are a few VSCode plugins that will be very helpful. These plugins will allow you to easily paste images into your documents and check your spelling.
 
-to install a plugin, in VSCode, click on the square extensions icon in the upper left tool bar (1), then in the search box (2) type the name of the plugin you wish to install, find the plugin you are looking for in the results, click on it and then click on the green "Install" button. After its installed you'll need to reload VSCode to use them.
+to install a plugin, in VSCode, click on the square extensions icon in the upper left tool bar (1), then in the search box (2) type the name of the plugin you wish to install, find the plugin you are looking for in the results, click on it and then click on the green "Install" button. After its installed you'll need to reload VSCode to use it.
 
 ![](images/2018-06-01-12-34-51.png)
 
@@ -51,7 +51,7 @@ Below are the recommended plugins for authoring Markdown:
 
 The "Paste Image" plugin is a huge time saver if your documentation will contain lots of images. Install the Paste Image plugin from "mushan".
 
-By default, Paste Image will create (if it doesn't already exist) a single "images" folder at the root of your directory structure for all images pasted. If you would like to keep your images folder at the same level of the directory structure as your markdown document (to keep them together), so can make the following configuration change. Go to **"File"** --> **"Preferences"** --> **"Settings"** and in the **"User Settings"** configuration section, add the following "pasteImage.*  entries between the curly braces like this: 
+By default, Paste Image will create (if it doesn't already exist) a single "images" folder at the root of your open directory structure for all images pasted. If you would like to keep your images folder at the same level of the directory structure as your markdown document (to keep them together), you can make the following configuration change. Go to **"File"** --> **"Preferences"** --> **"Settings"** and in the **"User Settings"** configuration section, add the following "pasteImage.*  entries between the curly braces like this: 
 
 ```json
 {
@@ -60,7 +60,7 @@ By default, Paste Image will create (if it doesn't already exist) a single "imag
 }
 ```
 
-After Paste Image is installed and configured, you can simply copy your prepared image or screenshot, insert the cursor where you want to insert the document and use **Ctrl+Alt+V** on Windows or Linux and **Cmd+Alt+V** on macOS. This will automatically create the images folder if doesn't already exist and place your image there naming it with a date/timestamp. The inserted text int the editor will look like the following:
+After Paste Image is installed and configured, you can simply copy your prepared image or screenshot, insert the cursor where you want to insert the image in the document and use **Ctrl+Alt+V** on Windows or Linux and **Cmd+Alt+V** on macOS. This will automatically create the images folder if doesn't already exist and place your image there naming it with a date/timestamp. The inserted text int the editor will look like the following:
 
 ```
 ![](images/2018-06-01-12-34-51.png)
@@ -74,7 +74,7 @@ More information about this plugin is available [**here**](https://marketplace.v
 
 ### **Spellchecker**
 
-VSCode doesn't include a built-in spell checker. To add a spell checker to VSCode, install the "Code Spell Checker" plugin from "Street Side Software". After the plugin is installed (and VSCode reloaded) it should automatically start finding typos. There will be a green squiggly under the suspect word. If the word is misspelled you can click on the word and a yellow light bulb icon should appear. Click on the light bulb icon and a menu should appear offering you suggestions. If the suspected work is in fact spelled correctly you can use the same context menu to add it to your local dictionary.
+VSCode doesn't include a built-in spell checker. To add a spell checker to VSCode, install the "Code Spell Checker" plugin from "Street Side Software". After the plugin is installed (and VSCode reloaded) it should automatically start finding typos. There will be a green squiggly line under the suspect word. If the word is misspelled you can click on the word and a yellow light bulb icon will appear. Click on the light bulb icon and a menu should appear offering you suggestions. If the suspected work is in fact spelled correctly you can use the same context menu to add it to your local dictionary.
 
 ![](images/2018-06-01-13-41-51.png)
 
