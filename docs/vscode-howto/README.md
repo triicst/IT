@@ -32,16 +32,16 @@ If the folder you have open to edit files is a Git repo, any changes made to fil
 
 ![](assets/2018-06-01-15-18-13.png)
 
-To push your changes to a remote repository, pull in any new changes from the remote remote repository or other git functions, click on the "**...**" icon **(5)** to reveal the full Git menu:
+To push your changes to a remote repository, pull in any new changes from the remote repository or other git functions, click on the "**...**" icon **(5)** to reveal the full Git menu:
 
 ![](assets/2018-06-01-15-19-56.png)
 
 
 ## **Installing Plugins**
 
-After you have VSCode in stalled, you can start creating and editing markdown files right away, but there are a few VSCode plugins that will be very helpful. These plugins will allow you to easily paste images into your documents and check your spelling.
+After you have VSCode in stalled, you can start creating and editing markdown files right away, but there are a few VSCode plugins that will be very helpful. These plugins will allow you to easily paste images into your documents and check the spelling.
 
-to install a plugin, in VSCode, click on the square extensions icon in the upper left tool bar (1), then in the search box (2) type the name of the plugin you wish to install, find the plugin you are looking for in the results, click on it and then click on the green "Install" button. After its installed you'll need to reload VSCode to use it.
+to install a plugin, in VSCode, click on the square extensions icon in the upper left tool bar **(1)**, then in the search box **(2)** type the name of the plugin you wish to install, find the plugin you are looking for in the results, click on it and then click on the green "Install" button. After it's installed you'll need to reload VSCode to use it.
 
 ![](assets/2018-06-01-12-34-51.png)
 
@@ -60,7 +60,7 @@ By default, Paste Image will create (if it doesn't already exist) a single "imag
 }
 ```
 
-***Note:** if you are editing markdown that is destined for the [Fred Hutch Wiki](https://fredhutch.github.io/wiki/) use "assets" rather than "images" in the setting above.
+***Note:** if you are editing markdown that is destined for the [Fred Hutch Wiki](https://fredhutch.github.io/wiki/) use "assets" rather than "images" in the setting above.*
 
 After Paste Image is installed and configured, you can simply copy your prepared image or screenshot, insert the cursor where you want to insert the image in the document and use **Ctrl+Alt+V** on Windows or Linux and **Cmd+Alt+V** on macOS. This will automatically create the images folder if doesn't already exist and place your image there naming it with a date/timestamp. The inserted text int the editor will look like the following:
 
@@ -68,7 +68,7 @@ After Paste Image is installed and configured, you can simply copy your prepared
 ![](assets/2018-06-01-12-34-51.png)
 ```
 
-Between the empty square brackets, you can place alt-text describing the image (won't be displayed in your browser). Without this alt-text the Markdown linter (plugin) will provide a warning, but it's O.K. to leave it empty if you like.
+Between the empty square brackets, you can place "alt-text" describing the image (it won't be displayed in your browser or the preview). Without this "alt-text" the Markdown linter (plugin) will provide a warning, but it's O.K. to leave it empty if you like.
 
 More information about this plugin is available [**here**](https://marketplace.visualstudio.com/items?itemName=mushan.vscode-paste-image)
 
