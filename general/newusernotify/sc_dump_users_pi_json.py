@@ -191,6 +191,49 @@ with open(outfolder + '/csv/users_all.csv', 'w') as f:
         mycsv.writerow(columns)
         mycsv.writerows(rows)
 
+# ********* staff_all 
+
+cursor = conn.cursor()
+cursor.execute("SELECT * FROM SC_users_all WHERE SC_users_all.paygroup = 'FHC'")
+columns = [i[0] for i in cursor.description]
+rows = cursor.fetchall()
+
+objects_list = []
+objects_list_today = []
+for row in rows:
+        d = collections.OrderedDict()
+        d['employeeID'] = row[0]
+        d['uid'] = row[1]
+        d['displayName'] = row[2]
+        d['mail'] = row[3]
+        d['title'] = row[4]
+        d['division'] = row[5]
+        d['mgrName'] = row[6]
+        d['givenName'] = row[7].strip()
+        d['sn'] = row[8]
+        d['hireDate'] = row[9].isoformat()
+        #d['deptID'] = row[10]
+        d['mgrID'] = row[11]
+        d['paygroup'] = row[12]
+        d['jobFunc'] = row[13]
+        d['jobTitle'] = row[14]
+        d['status'] = row[15]
+        #d['RowNum'] = row[16]
+        d['dept_id'] = row[17]
+        d['pi_dept'] = row[18]
+        d['dept_manager'] = row[19]
+        d['department'] = row[20]
+        objects_list.append(d)
+
+j = json.dumps(objects_list, indent=4, default=lambda x:str(x))
+
+with open(outfolder + '/json/staff_all.json', 'w') as f:
+        f.write(j)
+
+with open(outfolder + '/csv/staff_all.csv', 'w') as f:
+        mycsv = csv.writer(f, dialect='excel')
+        mycsv.writerow(columns)
+        mycsv.writerows(rows)
 
 # ****************************** SC_pi_all ********************************
 cursor = conn.cursor()
@@ -217,7 +260,7 @@ select
   FH_DIVISION as division
 into SCICOMP.dbo.SC_pi_all
 from SCICOMP.dbo.PS_FH_STAFF
-where (((JOB_FUNCTION = 'FAC' and PAYGROUP = 'FHC') or JOBTITLE = 'Full Member') and EMPL_STATUS <> 'T')
+where (((JOB_FUNCTION = 'FAC' and PAYGROUP = 'FHC') or JOBTITLE = 'Full Member') and EMPL_STATUS <> 'T' and EMPL_RCID = 0)
 group by DEPTID, EMPLID, FH_CENTERALIAS, PREFERRED_NAME, "NAME", LAST_NAME, FIRST_NAME, FH_EMAIL_ADDR1, JOBTITLE, BUSINESS_TITLE, FH_SUPV_NAME, DESCR, FH_DIVISION
 """)
 
