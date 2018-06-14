@@ -16,13 +16,19 @@ def main():
     # Parse command-line arguments
     arguments = parse_arguments()
         
-    if arguments.watched:
-        r = requests.get("https://api.github.com/users/%s/subscriptions?per_page=100" % (arguments.user))
-    else:
-        r = requests.get("https://api.github.com/users/%s/repos?per_page=100" % (arguments.user))
+    repos = []
+    for p in range(1,5):
+        if arguments.watched:
+            r = requests.get("https://api.github.com/users/%s/subscriptions?per_page=100&page=%s" % (arguments.user, p))
+        else:
+            r = requests.get("https://api.github.com/users/%s/repos?per_page=100&page=%s" % (arguments.user, p))
             # or repos?per_page=100&page=2
+        tmprepos = json.loads(r.content)
+        repos = repos + tmprepos
+        if len(tmprepos) < 100:
+	    break
 
-    repos = json.loads(r.content)
+    print("# of repos:",len(repos))
 
     urls = [repo['clone_url'] for repo in repos]
     ssh_urls = [repo['ssh_url'] for repo in repos]
