@@ -1,11 +1,12 @@
 #! /usr/bin/env python3
 
-import os, sys, psycopg2, argparse, csv
+import os, sys, psycopg2, argparse, csv, itertools, operator
 from messytables import CSVTableSet, type_guess, \
   types_processor, headers_guess, headers_processor, \
   offset_processor, any_tableset
-  
-rowtocheck = 5
+
+# takes type samples in these rows and returns the most common typeset
+rowstocheck = [3, 8, 12, 17, 20] 
 
 def main():
     
@@ -30,15 +31,20 @@ def main():
     except (Exception, psycopg2.DatabaseError) as error:
         print('Database error:', error)
         return False
+        
+    typelist = []
 
-    with open(args.csvfile, 'rb') as fh:        
+    with open(args.csvfile, 'rb') as fh:
         table_set = CSVTableSet(fh)
         row_set = table_set.tables[0]
         #print row_set.sample.next()
         offset, headers = headers_guess(row_set.sample)
         row_set.register_processor(headers_processor(headers))
-        row_set.register_processor(offset_processor(offset + rowtocheck))
-        types = type_guess(row_set.sample, strict=True)
+        for rowtocheck in rowstocheck:
+            row_set.register_processor(offset_processor(offset + rowtocheck))
+            types = type_guess(row_set.sample, strict=True)
+            typelist.append(types)
+        types = most_common(typelist)
 
     myd = dict (zip (headers, types))
     print("\nDetected columns & types:\n", myd, '\n')
@@ -48,9 +54,18 @@ def main():
     table = table.replace(' ','_')
     create_sql = "CREATE TABLE %s (" % table
     idh = 0
+    forcetype = {}
+    if args.settype != '':
+        forcetypes = args.settype.split(',')
+        for f in forcetypes:
+            forcetype[f.split(':')[0]] = f.split(':')[1]
+    #print(forcetype)
+    
     for h in headers:
         myt = "TEXT"
-        if str(types[idh]) == 'Integer':
+        if h in forcetype:
+            myt = forcetype[h]
+        elif str(types[idh]) == 'Integer':
             myt = 'BIGINT'
         elif str(types[idh]) == 'Bool':
              myt = 'BIGINT'
@@ -62,21 +77,22 @@ def main():
     create_sql = create_sql[:-2] + ');'
 
     print("\ncreating postgres table '%s':\n" % table, create_sql, '\n')
-    try:
-        if args.overwrite:
-            drop_sql = 'DROP TABLE IF EXISTS %s' % table
-            cur.execute(drop_sql)
+    if not args.debug:
+        try:
+            if args.overwrite:
+                drop_sql = 'DROP TABLE IF EXISTS %s' % table
+                cur.execute(drop_sql)
+                conn.commit()
+            cur.execute(create_sql)
             conn.commit()
-        cur.execute(create_sql)
-        conn.commit()
-    except (Exception, psycopg2.DatabaseError) as error:
-        print('Database error:', error)
-        sys.exit()
+        except (Exception, psycopg2.DatabaseError) as error:
+            print('Database error:', error)
+            sys.exit()
 
-    print("\nloading data .... ")
+    print("loading data .... \n")
 
-    with open(args.csvfile, 'rb') as fh:
-        sample_text = ''.join(str(fh.readline()) for x in range(3))
+    with open(args.csvfile, 'r') as fh1:
+        sample_text = ''.join(str(fh1.readline()) for x in range(3))
         try:
             dialect = csv.Sniffer().sniff(sample_text)
             if dialect.delimiter == 't':
@@ -86,16 +102,38 @@ def main():
         except:
             delim = ","
         copy_sql = "COPY %s FROM stdin WITH CSV HEADER DELIMITER as '%s'" % \
-                   (table, delim)        
-        try:
-            cur.copy_expert(sql=copy_sql, file=fh)
-            conn.commit()
-            cur.close()
-        except (Exception, psycopg2.DatabaseError) as error:
-            print('Database error:', error)
-            
-    print('Done !')
+                   (table, delim)
+                           
+    if not args.debug:
+        with open(args.csvfile, 'r') as fh2:
+            try:
+                cur.copy_expert(sql=copy_sql, file=fh2)
+                conn.commit()
+                cur.close()
+            except (Exception, psycopg2.DatabaseError) as error:
+                print('Database error:', error)
+                
+        print('Done !')
+    else:
+        print('Debugging: table not imported')
 
+def most_common(L):
+    # get an iterable of (item, iterable) pairs
+    SL = sorted((x, i) for i, x in enumerate(L))
+    # print 'SL:', SL
+    groups = itertools.groupby(SL, key=operator.itemgetter(0))
+    # auxiliary function to get "quality" for an item
+    def _auxfun(g):
+        item, iterable = g
+        count = 0
+        min_index = len(L)
+        for _, where in iterable:
+            count += 1
+            min_index = min(min_index, where)
+            # print 'item %r, count %r, minind %r' % (item, count, min_index)
+        return count, -min_index
+        # pick the highest-count/earliest item
+    return max(groups, key=_auxfun)[0]
 
 def parse_arguments():
     """
@@ -105,6 +143,8 @@ def parse_arguments():
         description='a tool for quickly loading csv files into Postgres ' + \
         'with limited schema detection capabilties (BIGINT & TEXT)')
     parser.add_argument( '--overwrite', '-o', dest='overwrite', action='store_true', default=False,
+        help="drop existing table if already exist.")
+    parser.add_argument( '--debug', '-d', dest='debug', action='store_true', default=False,
         help="drop existing table if already exist.")
     parser.add_argument('--settype', '-s', dest='settype', action='store', default='', 
         help='list of comma separated postgres type overwrites for field names, for example ' + \
