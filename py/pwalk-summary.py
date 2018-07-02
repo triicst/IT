@@ -18,6 +18,7 @@ def main():
 
     if args.sfolder == args.dfolder:
         print('   --sfolder and --dfolder need to be different folders.')
+        print('for example run: pwalk-summary.py --sfolder ~/csv/myfolder --dfolder ~/output --use-dask')
         return False
 
     # pwalk csv files have no column names so we need to set it 
