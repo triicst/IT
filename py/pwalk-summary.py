@@ -1,12 +1,16 @@
 #! /usr/bin/env python3
 
-# pwalk-summary summary aggregates pwalk output and groups by filetype or user 
+# pwalk-summary summary aggregates output from multiple pwalk runs and groups data 
+# by filetype or user 
+# you can add option --use-dask to process data with Dask instead of Pandas.
+# Dask is much faster when processing very large datasets while Pandas is faster
+# when processing small datasets. Dask uses as many CPUs it can get and a moderate
+# amount of memory while Pandas uses only a sinle CPU and all the memory it can get
 #
 # pwalk-summary dirkpetersen / Jul 2018
 #
 
-import sys, os, argparse, time, pandas, dask, dask.dataframe, glob
-#import time, socket, subprocess, numpy, tempfile, datetime, re
+import sys, os, argparse, time, numpy, pandas, dask, dask.dataframe, glob, pwd
 
 class KeyboardInterruptError(Exception): pass
 
@@ -16,41 +20,58 @@ def main():
         print('   --sfolder and --dfolder need to be different folders.')
         return False
 
+    # pwalk csv files have no column names so we need to set it 
     cols = ['inode', 'parentinode', 'directorydepth', 'filename', 'fileExtension', \
           'UID', 'GID', 'st_size', 'st_dev', 'st_blocks', 'st_nlink', 'st_mode', \
           'atime', 'mtime', 'ctime', 'count_files', 'sum_size']
 
+    # not strictly required, but defining types can accelerate things a bit
     dtypes = {'inode':int, 'parentinode':int, 'directorydepth':int, \
           'filename':str, 'fileExtension':str, 'UID':int, 'GID':int, \
-          'st_size':int, 'st_dev':int, 'st_blocks':int, 'st_nlink':int, \
+          'st_size':numpy.int64, 'st_dev':int, 'st_blocks':int, 'st_nlink':int, \
           'st_mode':int, 'atime':int, 'mtime':int, 'ctime':int, \
           'count_files':int, 'sum_size':int}
 
+    # much faster, if you only import the columnms you really need 
+    needcols = ['fileExtension', 'st_size', 'UID']
+
     if args.usedask:
         print('\n   loading csv files from %s into dask ...' % args.sfolder)
-        df = dask.dataframe.read_csv('%s/*.csv' % args.sfolder, header=None, names=cols, dtype=dtypes)
+        df = dask.dataframe.read_csv('%s/*.csv' % args.sfolder, header=None, 
+            names=cols, usecols=needcols, dtype=dtypes, encoding="latin_1")
     else:
         print('\n   loading csv files from %s into pandas ...' % args.sfolder)
-        df = pandas.concat([pandas.read_csv(f,header=None, names=cols, dtype=dtypes) 
-            for f in glob.glob('%s/*.csv' % args.sfolder)], ignore_index=True)
+        df = pandas.concat([pandas.read_csv(f,header=None, names=cols, 
+            usecols=needcols, dtype=dtypes, encoding="latin_1") 
+        for f in glob.glob('%s/*.csv' % args.sfolder)], ignore_index=True)
 
-    aggregations = {
-        'st_size': ['sum', 'mean'],
-        'fileExtension': 'count'
-    }
+    #aggregations = {'st_size': ['sum', 'mean'], 'fileExtension': 'count'}
+    aggregations = {'st_size': ['sum', 'mean', 'count']}
 
     print('\n   grouping data by extension ...')
     ext = df.groupby(["fileExtension"]).agg(aggregations) 
+    ext = ext.reset_index()
     print('\n   grouping data by user ...')
-    uid = df.groupby(["UID"]).agg(aggregations)
+    user = df.groupby(["UID"]).agg(aggregations)
+    # uidNumber is currently index, reset to turn into regualar column
+    user = user.reset_index()
 
     print('\n   writing result csv files to %s ...' % args.dfolder)
     if args.usedask:
         ext.to_csv(os.path.join(args.dfolder,'dask-byextension.*.csv'), header=True)
-        uid.to_csv(os.path.join(args.dfolder,'dask-byuser.*.csv'), header=True)    
+        user['UID'] = user['UID'].apply(uid2user, meta=('int'))
+        user.to_csv(os.path.join(args.dfolder,'dask-byuser.*.csv'), header=True)    
     else:
         ext.to_csv(os.path.join(args.dfolder,'pandas-byextension.csv'), header=True)
-        uid.to_csv(os.path.join(args.dfolder,'pandas-byuser.csv'), header=True)    
+        user['UID'] = user['UID'].apply(uid2user)
+        user.to_csv(os.path.join(args.dfolder,'pandas-byuser.csv'), header=True)    
+
+def uid2user(uid):
+    # get username based on uidnumber, return uidNumber if fails
+    try:
+        return pwd.getpwuid(uid).pw_name
+    except:
+        return str(uid)
 
 def send_mail(to, subject, text, attachments=[], cc=[], bcc=[], smtphost="", fromaddr=""):
 
