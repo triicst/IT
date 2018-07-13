@@ -8,7 +8,7 @@ an external database, in this case a json file.
 import sys, os, json, requests, subprocess
 
 # job titles that do not require an account. 
-titignore = ["Program Assistant", "Data Coordinator", "Project Coordinator", 
+titignore = ["Program Assistant", "Project Coordinator", 
              "Administrative Assistant", "Administrative Coordinator", 
              "Office Worker", "Data Operations Manager", 
              "Clinical Research Coordinator", "Administrative Manager", 
@@ -34,16 +34,19 @@ def main():
 	if len(groups_add) <= 100: 
 		for g in groups_add:
 			d = jsearchone(j,'pi_dept',g,'department')
-			s = ''
-			s = s + 'pvesh create /pools -poolid %s -comment "%s"\n' % (g,d.strip())
-			s = s + 'pveum groupadd %s -comment "%s"\n' % (g,d.strip())
-			s = s + 'pveum aclmod /pool/%s/ -group %s -role PVEAdmin\n' % (g,g)
-			s = s + 'pveum aclmod /storage/proxazfs/ -group %s -role PVEDatastoreUser\n' % g
-			s = s + 'pveum aclmod /storage/proxnfs/ -group %s -role PVEDatastoreUser\n' % g
-			print(s)
-			ret = run_script(s, output=True)
-			if ret > 0:
-				print('******** Error : %s' % ret)
+			if d:
+				s = ''
+				s = s + 'pvesh create /pools -poolid %s -comment "%s"\n' % (g,d.strip())
+				s = s + 'pveum groupadd %s -comment "%s"\n' % (g,d.strip())
+				s = s + 'pveum aclmod /pool/%s/ -group %s -role PVEAdmin\n' % (g,g)
+				s = s + 'pveum aclmod /storage/proxZFS/ -group %s -role PVEDatastoreUser\n' % g
+				s = s + 'pveum aclmod /storage/proxnfs/ -group %s -role PVEDatastoreUser\n' % g
+				print(s)
+				ret = run_script(s, output=True)
+				if ret > 0:
+					print('******** Error : %s' % ret)
+			else:
+			    print('department name empty')
 	else:
 		print('Error: will not add batches of more than 100 groups')
 
@@ -63,12 +66,13 @@ def main():
 	if x > 100: x = 100
 	print("\nAdding %s users...:" % len(uids_add), uids_add[0:x])
 	n = 1
-	if len(uids_add) <= 1000: 
+	if len(uids_add) <= 2000: 
 		for uid in uids_add:
 			print('%s: %s' % (n,uid))
 			# ignore some jobtitles 
 			if jsearchone(j,"uid",uid,"mail") == "" or jsearchone(j,"uid",uid,"title") in titignore:
-				continue
+			    print('skipping user %s because of job title' % uid)
+			    continue
 				
 			##### this is too long, /etc/pve/user.cfg can only be 128K
 			#s = 'pveum useradd %s@FHCRC.ORG -email %s -firstname %s -lastname %s -groups %s -comment "%s"' % \
@@ -82,7 +86,7 @@ def main():
 	else:
 		print('Error: will not add batches of more than 1000 users')
 
-	# deleting diabled users but never more than 10
+	# deleting disbled users but never more than 10
 	print("\nDeleting %s users...:" % len(uids_del),uids_del)
 	if len(uids_del) <= 10: 
 		for uid in uids_del:

@@ -26,7 +26,7 @@ def main():
         tmprepos = json.loads(r.content)
         repos = repos + tmprepos
         if len(tmprepos) < 100:
-	    break
+            break
 
     print("# of repos:",len(repos))
 
@@ -117,11 +117,18 @@ def main():
 
 def send_mail(to, subject, text, attachments=[], cc=[], bcc=[], smtphost="", fromaddr=""):
 
-    from email.MIMEMultipart import MIMEMultipart
-    from email.MIMEBase import MIMEBase
-    from email.MIMEText import MIMEText
-    from email.Utils import COMMASPACE, formatdate
-    from email import Encoders
+    if sys.version_info[0] == 2:
+        from email.MIMEMultipart import MIMEMultipart
+        from email.MIMEBase import MIMEBase
+        from email.MIMEText import MIMEText
+        from email.Utils import COMMASPACE, formatdate
+        from email import Encoders
+    else:
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.base import MIMEBase
+        from email.mime.text import MIMEText
+        from email.utils import COMMASPACE, formatdate
+        from email import encoders as Encoders
     from string import Template
     import socket
     import smtplib
@@ -217,12 +224,12 @@ def parse_arguments():
     parser.add_argument( '--email-notify', '-e', dest='email',
         action='store',
         help='notify this email address of any uncommitted changes ',
-        default='' )        
+        default='' )
     parser.add_argument( '--umask', '-m', dest='umask',
         action='store',
         type=int,
         help='temporarily set the umask for repositories setup in shared mode (default=0002)',
-        default=0002 )    
+        default=0o002)
     parser.add_argument( '--dir', '-d', dest='dir',
         action='store', 
         help='root directory where repositories will be created or updated',
