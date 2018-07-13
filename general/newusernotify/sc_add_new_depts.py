@@ -9,6 +9,7 @@
 import sys, os, pymssql, requests, csv, json, collections, re
 
 mailto = 'cit-sc@fredhutch.org'
+outfolder = '/var/www/toolbox'
 
 def main():
 
@@ -52,7 +53,35 @@ def main():
 	   "This script adds new departments to table SC_CostCenters and it failed with this error message:\n %s" % str(e))
 	   
 	conn.commit()
+
+
+	# exporting department names to json and csv
+
+	cursor = conn.cursor()
+	cursor.execute('SELECT * FROM SC_CostCenters;')
+	columns = [i[0] for i in cursor.description]
+	rows = cursor.fetchall()
+
+	objects_list = []
+	objects_list_today = []
+	for row in rows:
+			d = collections.OrderedDict()
+			d['dept_id'] = row[0]
+			d['pi_dept'] = row[1]
+			d['dept_manager'] = row[2]
+			d['department'] = row[3]
+			objects_list.append(d)
+
 	conn.close()
+
+	j = json.dumps(objects_list, indent=4, default=lambda x:str(x))
+	with open(outfolder + '/json/departments.json', 'w') as f:
+			f.write(j)
+
+	with open(outfolder + '/csv/departments.csv', 'w') as f:
+			mycsv = csv.writer(f, dialect='excel')
+			mycsv.writerow(columns)
+			mycsv.writerows(rows)
 	
 	return True
 
