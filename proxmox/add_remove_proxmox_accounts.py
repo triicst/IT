@@ -5,7 +5,7 @@ automating adding and deleting proxmox users based on content of
 an external database, in this case a json file.
 """
 
-import sys, os, json, requests, subprocess
+import sys, os, json, requests, subprocess, datetime
 
 # job titles that do not require an account. 
 titignore = ["Program Assistant", "Project Coordinator", 
@@ -30,6 +30,7 @@ def main():
 	groups = uniq(jget(j, 'pi_dept'))
 	groups_add, groups_remove = listcompare('/var/tmp/groups_last.json', groups)
 	
+	print('############# %s ##################' % datetime.datetime.now())
 	print("\nAdding %s groups/pools...:" % len(groups_add),groups_add)
 	if len(groups_add) <= 100: 
 		for g in groups_add:
